@@ -27,8 +27,11 @@ public:
     Q_INVOKABLE QImage screenshot(int x = 0, int y = 0, int width = -1, int height = -1) const;
     Q_INVOKABLE bool save(const QString &filePath, int x = 0, int y = 0, int width = -1, int height = -1) const;
     Q_INVOKABLE QString status() const;
-    Q_INVOKABLE void mouseMove(int x, int y);
+    Q_INVOKABLE void mouseMove(int x, int y, int button = 0);
     Q_INVOKABLE void mouseClick(int x, int y, int button = 1);
+    Q_INVOKABLE void mousePress(int x, int y, int button = 1);
+    Q_INVOKABLE void mouseRelease(int x, int y, int button = 1);
+    Q_INVOKABLE void longPress(int x, int y, int duration = 1000, int button = 1);
     Q_INVOKABLE void dragAndDrop(int x, int y, int button = 1);
     Q_INVOKABLE void sendKey(int keysym, bool down);
     Q_INVOKABLE void sendText(const QString &text);

@@ -5,6 +5,7 @@
 #include "vncwidget.h"
 #include <QtVncClient/QVncClient>
 #include <QtNetwork/QTcpSocket>
+#include <QtCore/QTimer>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QMouseEvent>
 
@@ -86,10 +87,19 @@ QString Tools::status() const
     return QStringLiteral("disconnected");
 }
 
-void Tools::mouseMove(int x, int y)
+void Tools::mouseMove(int x, int y, int button)
 {
+    Qt::MouseButton qtButton = Qt::NoButton;
+    if (button == 1)
+        qtButton = Qt::LeftButton;
+    else if (button == 2)
+        qtButton = Qt::MiddleButton;
+    else if (button == 3)
+        qtButton = Qt::RightButton;
+
     d->pos = QPointF(x, y);
-    QMouseEvent event(QEvent::MouseMove, d->pos, d->pos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+
+    QMouseEvent event(QEvent::MouseMove, d->pos, d->pos, Qt::NoButton, qtButton, Qt::NoModifier);
     d->vncClient.handlePointerEvent(&event);
 }
 
@@ -110,6 +120,53 @@ void Tools::mouseClick(int x, int y, int button)
     // Release
     QMouseEvent releaseEvent(QEvent::MouseButtonRelease, d->pos, d->pos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     d->vncClient.handlePointerEvent(&releaseEvent);
+}
+
+void Tools::mousePress(int x, int y, int button)
+{
+    Qt::MouseButton qtButton = Qt::LeftButton;
+    if (button == 2)
+        qtButton = Qt::MiddleButton;
+    else if (button == 3)
+        qtButton = Qt::RightButton;
+
+    d->pos = QPointF(x, y);
+
+    QMouseEvent pressEvent(QEvent::MouseButtonPress, d->pos, d->pos, qtButton, qtButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&pressEvent);
+}
+
+void Tools::mouseRelease(int x, int y, int button)
+{
+    Qt::MouseButton qtButton = Qt::LeftButton;
+    if (button == 2)
+        qtButton = Qt::MiddleButton;
+    else if (button == 3)
+        qtButton = Qt::RightButton;
+
+    d->pos = QPointF(x, y);
+
+    QMouseEvent releaseEvent(QEvent::MouseButtonRelease, d->pos, d->pos, qtButton, Qt::NoButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&releaseEvent);
+}
+
+void Tools::longPress(int x, int y, int duration, int button)
+{
+    Qt::MouseButton qtButton = Qt::LeftButton;
+    if (button == 2)
+        qtButton = Qt::MiddleButton;
+    else if (button == 3)
+        qtButton = Qt::RightButton;
+
+    d->pos = QPointF(x, y);
+
+    QMouseEvent pressEvent(QEvent::MouseButtonPress, d->pos, d->pos, qtButton, qtButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&pressEvent);
+
+    QTimer::singleShot(duration, this, [this, qtButton]() {
+        QMouseEvent releaseEvent(QEvent::MouseButtonRelease, d->pos, d->pos, qtButton, Qt::NoButton, Qt::NoModifier);
+        d->vncClient.handlePointerEvent(&releaseEvent);
+    });
 }
 
 void Tools::dragAndDrop(int x, int y, int button)
