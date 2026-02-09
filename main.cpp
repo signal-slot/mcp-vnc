@@ -16,6 +16,7 @@ int main(int argc, char *argv[])
     app.setQuitOnLastWindowClosed(false);
 
     QMcpServer server("stdio"_L1);
+    QObject::connect(&server, &QMcpServer::finished, &app, &QCoreApplication::quit);
     auto *tools = new Tools(&server);
     server.registerToolSet(tools, {
         { "connect", "Connect to a VNC server" },
