@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void sendText(const QString &text);
     Q_INVOKABLE void setPreview(bool visible);
     Q_INVOKABLE void setInteractive(bool enabled);
+    Q_INVOKABLE void setStaysOnTop(bool enabled);
 
 private:
     class Private;

@@ -227,3 +227,12 @@ void Tools::setInteractive(bool enabled)
     if (d->previewWidget)
         d->previewWidget->setInteractive(enabled);
 }
+
+void Tools::setStaysOnTop(bool enabled)
+{
+    if (!d->previewWidget)
+        return;
+    d->previewWidget->setWindowFlag(Qt::WindowStaysOnTopHint, enabled);
+    if (d->previewWidget->isVisible())
+        d->previewWidget->show();
+}

@@ -37,6 +37,16 @@ target_link_libraries(mcp-vnc PRIVATE
     Qt::McpServer
 )
 
+# Ensure non-system Qt component headers take priority over system Qt headers
+foreach(_target Qt6::McpServer Qt6::McpCommon Qt6::VncClient)
+    if(TARGET ${_target})
+        get_target_property(_dirs ${_target} INTERFACE_INCLUDE_DIRECTORIES)
+        if(_dirs)
+            target_include_directories(mcp-vnc BEFORE PRIVATE ${_dirs})
+        endif()
+    endif()
+endforeach()
+
 install(TARGETS mcp-vnc
     RUNTIME DESTINATION "${INSTALL_EXAMPLEDIR}"
     BUNDLE DESTINATION "${INSTALL_EXAMPLEDIR}"

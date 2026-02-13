@@ -48,6 +48,7 @@ mcp-vnc communicates via stdio using the MCP protocol. Configure it as an MCP se
 | `sendText` | Type a string of text |
 | `setPreview` | Show/hide the live VNC preview window |
 | `setInteractive` | Enable/disable forwarding input from the preview window to the VNC server |
+| `setStaysOnTop` | Toggle whether the preview window stays on top of other windows |
 
 ## License
 

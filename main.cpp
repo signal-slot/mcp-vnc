@@ -70,6 +70,8 @@ int main(int argc, char *argv[])
         { "setPreview/visible", "true to show, false to hide" },
         { "setInteractive", "Enable or disable interactive mode on the preview window. When enabled, mouse and keyboard events on the preview window are forwarded to the VNC server. Default is off (view-only)." },
         { "setInteractive/enabled", "true to enable interactive mode, false to disable" },
+        { "setStaysOnTop", "Toggle whether the preview window stays on top of other windows" },
+        { "setStaysOnTop/enabled", "true to keep the window on top, false to allow normal stacking" },
     });
     server.start();
 
