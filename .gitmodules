@@ -1,0 +1,6 @@
+[submodule "3rdparty/qtmcp"]
+	path = 3rdparty/qtmcp
+	url = git@github.com:signal-slot/qtmcp.git
+[submodule "3rdparty/qtvncclient"]
+	path = 3rdparty/qtvncclient
+	url = git@github.com:signal-slot/qtvncclient.git
