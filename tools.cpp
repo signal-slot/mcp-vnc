@@ -232,7 +232,8 @@ void Tools::setStaysOnTop(bool enabled)
 {
     if (!d->previewWidget)
         return;
+    const bool wasVisible = d->previewWidget->isVisible();
     d->previewWidget->setWindowFlag(Qt::WindowStaysOnTopHint, enabled);
-    if (d->previewWidget->isVisible())
+    if (wasVisible)
         d->previewWidget->show();
 }
