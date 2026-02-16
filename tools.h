@@ -29,6 +29,7 @@ public:
     Q_INVOKABLE QString status() const;
     Q_INVOKABLE void mouseMove(int x, int y, int button = 0);
     Q_INVOKABLE void mouseClick(int x, int y, int button = 1);
+    Q_INVOKABLE void doubleClick(int x, int y, int button = 1);
     Q_INVOKABLE void mousePress(int x, int y, int button = 1);
     Q_INVOKABLE void mouseRelease(int x, int y, int button = 1);
     Q_INVOKABLE void longPress(int x, int y, int duration = 1000, int button = 1);

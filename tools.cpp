@@ -122,6 +122,31 @@ void Tools::mouseClick(int x, int y, int button)
     d->vncClient.handlePointerEvent(&releaseEvent);
 }
 
+void Tools::doubleClick(int x, int y, int button)
+{
+    Qt::MouseButton qtButton = Qt::LeftButton;
+    if (button == 2)
+        qtButton = Qt::MiddleButton;
+    else if (button == 3)
+        qtButton = Qt::RightButton;
+
+    d->pos = QPointF(x, y);
+
+    // First click: Press + Release
+    QMouseEvent pressEvent(QEvent::MouseButtonPress, d->pos, d->pos, qtButton, qtButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&pressEvent);
+
+    QMouseEvent releaseEvent(QEvent::MouseButtonRelease, d->pos, d->pos, qtButton, Qt::NoButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&releaseEvent);
+
+    // Second click: DblClick + Release
+    QMouseEvent dblClickEvent(QEvent::MouseButtonDblClick, d->pos, d->pos, qtButton, qtButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&dblClickEvent);
+
+    QMouseEvent releaseEvent2(QEvent::MouseButtonRelease, d->pos, d->pos, qtButton, Qt::NoButton, Qt::NoModifier);
+    d->vncClient.handlePointerEvent(&releaseEvent2);
+}
+
 void Tools::mousePress(int x, int y, int button)
 {
     Qt::MouseButton qtButton = Qt::LeftButton;
