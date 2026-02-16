@@ -262,3 +262,10 @@ void Tools::setStaysOnTop(bool enabled)
     if (wasVisible)
         d->previewWidget->show();
 }
+
+void Tools::setPreviewTitle(const QString &title)
+{
+    if (!d->previewWidget)
+        return;
+    d->previewWidget->setWindowTitle(title);
+}

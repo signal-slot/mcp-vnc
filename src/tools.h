@@ -39,6 +39,7 @@ public:
     Q_INVOKABLE void setPreview(bool visible);
     Q_INVOKABLE void setInteractive(bool enabled);
     Q_INVOKABLE void setStaysOnTop(bool enabled);
+    Q_INVOKABLE void setPreviewTitle(const QString &title);
 
 private:
     class Private;

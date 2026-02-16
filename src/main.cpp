@@ -76,6 +76,8 @@ int main(int argc, char *argv[])
         { "setInteractive/enabled", "true to enable interactive mode, false to disable" },
         { "setStaysOnTop", "Toggle whether the preview window stays on top of other windows" },
         { "setStaysOnTop/enabled", "true to keep the window on top, false to allow normal stacking" },
+        { "setPreviewTitle", "Set the title of the preview window" },
+        { "setPreviewTitle/title", "The title text to display in the preview window's title bar" },
     });
     server.start();
 
