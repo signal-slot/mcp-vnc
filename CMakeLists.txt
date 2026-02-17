@@ -43,6 +43,7 @@ ExternalProject_Add(ep_qtvncclient
 
 ExternalProject_Add(ep_mcp-vnc
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    BINARY_DIR "${CMAKE_BINARY_DIR}/mcp-vnc"
     LIST_SEPARATOR |
     CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
