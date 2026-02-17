@@ -5,6 +5,8 @@
 #include "vncwidget.h"
 #include <QtVncClient/QVncClient>
 #include <QtNetwork/QTcpSocket>
+#include <QtCore/QPromise>
+#include <QtCore/QSharedPointer>
 #include <QtCore/QTimer>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QMouseEvent>
@@ -42,6 +44,7 @@ Tools::Tools(QObject *parent)
     , d(new Private)
 {
     d->vncClient.setSocket(&d->socket);
+    d->vncClient.setFramebufferUpdatesEnabled(false);
     QObject::connect(&d->vncClient, &QVncClient::connectionStateChanged, this, [this](bool connected) {
         if (!d->previewWidget)
             return;
@@ -82,9 +85,8 @@ void Tools::disconnect()
     d->socket.disconnectFromHost();
 }
 
-QImage Tools::screenshot(int x, int y, int width, int height) const
+static QImage extractRegion(const QImage &image, int x, int y, int width, int height)
 {
-    const QImage &image = d->vncClient.image();
     if (width < 0)
         width = image.width() - x;
     if (height < 0)
@@ -94,9 +96,62 @@ QImage Tools::screenshot(int x, int y, int width, int height) const
     return image.copy(x, y, width, height);
 }
 
-bool Tools::save(const QString &filePath, int x, int y, int width, int height) const
+QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int width, int height)
 {
-    return screenshot(x, y, width, height).save(filePath);
+    if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpImageContent(extractRegion(d->vncClient.image(), x, y, width, height))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+    d->vncClient.setFramebufferUpdatesEnabled(true);
+    auto conn = QSharedPointer<QMetaObject::Connection>::create();
+    *conn = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, conn, x, y, width, height]() {
+            QObject::disconnect(*conn);
+            d->vncClient.setFramebufferUpdatesEnabled(false);
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpImageContent(extractRegion(d->vncClient.image(), x, y, width, height))));
+            promise->addResult(content);
+            promise->finish();
+        });
+    return promise->future();
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::save(const QString &filePath, int x, int y, int width, int height)
+{
+    if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        bool ok = extractRegion(d->vncClient.image(), x, y, width, height).save(filePath);
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(ok ? QStringLiteral("true") : QStringLiteral("false"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+    d->vncClient.setFramebufferUpdatesEnabled(true);
+    auto conn = QSharedPointer<QMetaObject::Connection>::create();
+    *conn = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, conn, filePath, x, y, width, height]() {
+            QObject::disconnect(*conn);
+            d->vncClient.setFramebufferUpdatesEnabled(false);
+            bool ok = extractRegion(d->vncClient.image(), x, y, width, height).save(filePath);
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(ok ? QStringLiteral("true") : QStringLiteral("false"))));
+            promise->addResult(content);
+            promise->finish();
+        });
+    return promise->future();
 }
 
 QString Tools::status() const
@@ -263,6 +318,7 @@ void Tools::sendText(const QString &text)
 void Tools::setPreview(bool visible)
 {
     d->previewEnabled = visible;
+    d->vncClient.setFramebufferUpdatesEnabled(visible);
     if (!d->previewWidget)
         return;
     if (visible && d->socket.state() == QTcpSocket::ConnectedState)

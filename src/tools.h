@@ -4,9 +4,11 @@
 #ifndef TOOLS_H
 #define TOOLS_H
 
+#include <QtCore/QFuture>
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
 #include <QtGui/QImage>
+#include <QtMcpCommon/qmcpcalltoolresultcontent.h>
 
 class QVncClient;
 class QWidget;
@@ -24,8 +26,8 @@ public:
 
     Q_INVOKABLE void connect(const QString &host, int port, const QString &password = QString());
     Q_INVOKABLE void disconnect();
-    Q_INVOKABLE QImage screenshot(int x = 0, int y = 0, int width = -1, int height = -1) const;
-    Q_INVOKABLE bool save(const QString &filePath, int x = 0, int y = 0, int width = -1, int height = -1) const;
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> screenshot(int x = 0, int y = 0, int width = -1, int height = -1);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> save(const QString &filePath, int x = 0, int y = 0, int width = -1, int height = -1);
     Q_INVOKABLE QString status() const;
     Q_INVOKABLE void mouseMove(int x, int y, int button = 0);
     Q_INVOKABLE void mouseClick(int x, int y, int button = 1);

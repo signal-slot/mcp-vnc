@@ -39,6 +39,7 @@ target_link_libraries(mcp-vnc PRIVATE
     Qt::Network
     Qt::Widgets
     Qt::VncClient
+    Qt::McpCommon
     Qt::McpServer
 )
 
