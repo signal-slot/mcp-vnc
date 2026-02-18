@@ -55,7 +55,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /src/build/mcp-vnc/mcp-vnc /usr/bin/mcp-vnc
+COPY --from=builder /src/build/mcp-vnc /usr/bin/mcp-vnc
 COPY --from=builder /staging/lib/ /usr/local/lib/
 COPY --from=builder /staging/plugins/ /usr/local/lib/qt6/plugins/
 RUN ldconfig
