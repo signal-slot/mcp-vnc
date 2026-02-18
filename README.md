@@ -2,7 +2,13 @@
 
 An MCP (Model Context Protocol) server that exposes VNC client operations as tools. Allows AI assistants to connect to, view, and control remote desktops over VNC.
 
-## Quick Start (Docker)
+## Install
+
+```bash
+docker pull signalslot/mcp-vnc
+```
+
+Add to your MCP client configuration:
 
 ```json
 {
