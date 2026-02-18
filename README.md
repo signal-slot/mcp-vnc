@@ -5,7 +5,7 @@ An MCP (Model Context Protocol) server that exposes VNC client operations as too
 ## Install
 
 ```bash
-docker pull signalslot/mcp-vnc
+docker pull ghcr.io/signal-slot/mcp-vnc
 ```
 
 Add to your MCP client configuration:
@@ -15,7 +15,7 @@ Add to your MCP client configuration:
   "mcpServers": {
     "vnc": {
       "command": "docker",
-      "args": ["run", "--rm", "-i", "--network=host", "signalslot/mcp-vnc"]
+      "args": ["run", "--rm", "-i", "--network=host", "ghcr.io/signal-slot/mcp-vnc"]
     }
   }
 }
