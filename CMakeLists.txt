@@ -43,7 +43,7 @@ ExternalProject_Add(ep_qtvncclient
 
 ExternalProject_Add(ep_mcp-vnc
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    BINARY_DIR "${CMAKE_BINARY_DIR}/mcp-vnc"
+    BINARY_DIR "${CMAKE_BINARY_DIR}/src"
     LIST_SEPARATOR |
     CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -53,6 +53,7 @@ ExternalProject_Add(ep_mcp-vnc
         -DQt6McpServer_DIR=${DEPS_CMAKE_DIR}/Qt6McpServer
         -DQt6VncClient_DIR=${DEPS_CMAKE_DIR}/Qt6VncClient
         -DDEPS_INCLUDE_DIR=${DEPS_INSTALL_PREFIX}/include/qt6
+        -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}
     INSTALL_COMMAND ""
     DEPENDS ep_qtmcp ep_qtvncclient
     BUILD_ALWAYS ON
