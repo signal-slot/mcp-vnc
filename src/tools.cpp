@@ -8,6 +8,13 @@
 #include <QtCore/QTimer>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QMouseEvent>
+#ifdef HAVE_MULTIMEDIA
+#include <QtMultimedia/QMediaCaptureSession>
+#include <QtMultimedia/QMediaFormat>
+#include <QtMultimedia/QMediaRecorder>
+#include <QtMultimedia/QVideoFrame>
+#include <QtMultimedia/QVideoFrameInput>
+#endif
 
 class Tools::Private
 {
@@ -17,6 +24,17 @@ public:
     VncWidget *previewWidget = nullptr;
     bool previewEnabled = false;
     QPointF pos;
+
+#ifdef HAVE_MULTIMEDIA
+    // Recording members
+    QMediaCaptureSession *captureSession = nullptr;
+    QMediaRecorder *recorder = nullptr;
+    QVideoFrameInput *videoFrameInput = nullptr;
+    QTimer *recordingTimer = nullptr;
+    bool recording = false;
+    bool readyForFrame = false;
+    int recordingFps = 10;
+#endif
 };
 
 Tools::Tools(QObject *parent)
@@ -34,7 +52,13 @@ Tools::Tools(QObject *parent)
     });
 }
 
-Tools::~Tools() = default;
+Tools::~Tools()
+{
+#ifdef HAVE_MULTIMEDIA
+    if (d->recording)
+        stopRecording();
+#endif
+}
 
 QVncClient *Tools::client() const
 {
@@ -269,3 +293,85 @@ void Tools::setPreviewTitle(const QString &title)
         return;
     d->previewWidget->setWindowTitle(title);
 }
+
+#ifdef HAVE_MULTIMEDIA
+bool Tools::startRecording(const QString &filePath, int fps)
+{
+    if (d->recording)
+        return false;
+    if (d->socket.state() != QTcpSocket::ConnectedState)
+        return false;
+
+    const QImage &image = d->vncClient.image();
+    if (image.isNull())
+        return false;
+
+    fps = qBound(1, fps, 60);
+
+    d->videoFrameInput = new QVideoFrameInput(this);
+    d->recorder = new QMediaRecorder(this);
+    d->captureSession = new QMediaCaptureSession(this);
+
+    d->captureSession->setVideoFrameInput(d->videoFrameInput);
+
+    QMediaFormat mediaFormat(QMediaFormat::MPEG4);
+    mediaFormat.setVideoCodec(QMediaFormat::VideoCodec::H264);
+    d->recorder->setMediaFormat(mediaFormat);
+    d->recorder->setOutputLocation(QUrl::fromLocalFile(filePath));
+    d->recorder->setVideoResolution(image.size());
+    d->recorder->setVideoFrameRate(fps);
+    d->recorder->setQuality(QMediaRecorder::VeryHighQuality);
+
+    d->recordingFps = fps;
+    d->readyForFrame = false;
+
+    QObject::connect(d->videoFrameInput, &QVideoFrameInput::readyToSendVideoFrame, this, [this]() {
+        d->readyForFrame = true;
+    });
+
+    d->recordingTimer = new QTimer(this);
+    d->recordingTimer->setTimerType(Qt::PreciseTimer);
+    d->recordingTimer->setInterval(1000 / fps);
+    QObject::connect(d->recordingTimer, &QTimer::timeout, this, [this]() {
+        if (!d->recording || !d->readyForFrame)
+            return;
+        const QImage &img = d->vncClient.image();
+        if (img.isNull())
+            return;
+        d->readyForFrame = false;
+        QVideoFrame frame(img.convertToFormat(QImage::Format_ARGB32));
+        frame.setStreamFrameRate(d->recordingFps);
+        d->videoFrameInput->sendVideoFrame(frame);
+    });
+
+    d->captureSession->setRecorder(d->recorder);
+    d->recorder->record();
+    d->recordingTimer->start();
+
+    d->recording = true;
+    return true;
+}
+
+bool Tools::stopRecording()
+{
+    if (!d->recording)
+        return false;
+
+    d->recording = false;
+
+    d->recordingTimer->stop();
+    d->recordingTimer->deleteLater();
+    d->recordingTimer = nullptr;
+
+    d->recorder->stop();
+
+    d->captureSession->deleteLater();
+    d->captureSession = nullptr;
+    d->recorder->deleteLater();
+    d->recorder = nullptr;
+    d->videoFrameInput->deleteLater();
+    d->videoFrameInput = nullptr;
+
+    return true;
+}
+#endif

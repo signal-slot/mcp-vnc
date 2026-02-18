@@ -40,6 +40,10 @@ public:
     Q_INVOKABLE void setInteractive(bool enabled);
     Q_INVOKABLE void setStaysOnTop(bool enabled);
     Q_INVOKABLE void setPreviewTitle(const QString &title);
+#ifdef HAVE_MULTIMEDIA
+    Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);
+    Q_INVOKABLE bool stopRecording();
+#endif
 
 private:
     class Private;

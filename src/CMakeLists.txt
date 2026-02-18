@@ -13,6 +13,7 @@ endif()
 set(INSTALL_EXAMPLEDIR "${INSTALL_EXAMPLESDIR}/qtvncclient/mcp-vnc")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Widgets VncClient McpServer)
+find_package(Qt6 OPTIONAL_COMPONENTS Multimedia)
 
 qt_standard_project_setup()
 
@@ -40,6 +41,11 @@ target_link_libraries(mcp-vnc PRIVATE
     Qt::VncClient
     Qt::McpServer
 )
+
+if(TARGET Qt::Multimedia)
+    target_link_libraries(mcp-vnc PRIVATE Qt::Multimedia)
+    target_compile_definitions(mcp-vnc PRIVATE HAVE_MULTIMEDIA)
+endif()
 
 install(TARGETS mcp-vnc
     RUNTIME DESTINATION "${INSTALL_EXAMPLEDIR}"

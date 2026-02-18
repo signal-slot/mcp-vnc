@@ -78,6 +78,12 @@ int main(int argc, char *argv[])
         { "setStaysOnTop/enabled", "true to keep the window on top, false to allow normal stacking" },
         { "setPreviewTitle", "Set the title of the preview window" },
         { "setPreviewTitle/title", "The title text to display in the preview window's title bar" },
+#ifdef HAVE_MULTIMEDIA
+        { "startRecording", "Start recording the VNC screen to an MP4 video file" },
+        { "startRecording/filePath", "File path for the output MP4 file (e.g., /tmp/recording.mp4)" },
+        { "startRecording/fps", "Frames per second for recording (default: 10, max: 60)" },
+        { "stopRecording", "Stop the current screen recording and finalize the MP4 file" },
+#endif
     });
     server.start();
 
