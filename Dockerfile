@@ -60,6 +60,7 @@ COPY --from=builder /staging/lib/ /usr/local/lib/
 COPY --from=builder /staging/plugins/ /usr/local/lib/qt6/plugins/
 RUN ldconfig
 
+ENV LANG=C.UTF-8
 ENV QT_PLUGIN_PATH=/usr/local/lib/qt6/plugins
 ENV QT_QPA_PLATFORM=offscreen
 
