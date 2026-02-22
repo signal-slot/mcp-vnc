@@ -87,6 +87,8 @@ void Tools::disconnect()
 
 static QImage extractRegion(const QImage &image, int x, int y, int width, int height)
 {
+    if (image.isNull())
+        return {};
     if (width < 0)
         width = image.width() - x;
     if (height < 0)
@@ -96,14 +98,22 @@ static QImage extractRegion(const QImage &image, int x, int y, int width, int he
     return image.copy(x, y, width, height);
 }
 
+static QList<QMcpCallToolResultContent> imageOrError(const QImage &image)
+{
+    QList<QMcpCallToolResultContent> content;
+    if (image.isNull())
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: no framebuffer available or region is out of bounds"))));
+    else
+        content.append(QMcpCallToolResultContent(QMcpImageContent(image)));
+    return content;
+}
+
 QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int width, int height)
 {
     if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
         QPromise<QList<QMcpCallToolResultContent>> promise;
         promise.start();
-        QList<QMcpCallToolResultContent> content;
-        content.append(QMcpCallToolResultContent(QMcpImageContent(extractRegion(d->vncClient.image(), x, y, width, height))));
-        promise.addResult(content);
+        promise.addResult(imageOrError(extractRegion(d->vncClient.image(), x, y, width, height)));
         promise.finish();
         return promise.future();
     }
@@ -116,9 +126,7 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int wi
         [this, promise, conn, x, y, width, height]() {
             QObject::disconnect(*conn);
             d->vncClient.setFramebufferUpdatesEnabled(false);
-            QList<QMcpCallToolResultContent> content;
-            content.append(QMcpCallToolResultContent(QMcpImageContent(extractRegion(d->vncClient.image(), x, y, width, height))));
-            promise->addResult(content);
+            promise->addResult(imageOrError(extractRegion(d->vncClient.image(), x, y, width, height)));
             promise->finish();
         });
     return promise->future();
