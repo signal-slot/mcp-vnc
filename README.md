@@ -4,11 +4,29 @@ An MCP (Model Context Protocol) server that exposes VNC client operations as too
 
 ## Install
 
+### AppImage (Linux)
+
+Download the latest AppImage from [Releases](https://github.com/signal-slot/mcp-vnc/releases):
+
+```bash
+chmod +x mcp-vnc-*-x86_64.AppImage
+```
+
+```json
+{
+  "mcpServers": {
+    "vnc": {
+      "command": "/path/to/mcp-vnc-0.1.0-x86_64.AppImage"
+    }
+  }
+}
+```
+
+### Docker
+
 ```bash
 docker pull ghcr.io/signal-slot/mcp-vnc
 ```
-
-Add to your MCP client configuration:
 
 ```json
 {
