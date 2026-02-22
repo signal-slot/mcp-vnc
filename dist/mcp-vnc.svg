@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="4" y="8" width="56" height="40" rx="3" fill="#2d2d2d" stroke="#4a9eff" stroke-width="2"/>
+  <rect x="8" y="12" width="48" height="32" fill="#1a1a2e"/>
+  <rect x="24" y="48" width="16" height="4" fill="#4a9eff"/>
+  <rect x="18" y="52" width="28" height="3" rx="1" fill="#4a9eff"/>
+  <text x="32" y="33" font-family="monospace" font-size="12" fill="#4a9eff" text-anchor="middle">VNC</text>
+</svg>

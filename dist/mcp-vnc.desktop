@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MCP VNC
+Exec=mcp-vnc
+Icon=mcp-vnc
+Comment=MCP server exposing VNC client operations as tools
+Categories=Development;Network;
+NoDisplay=true
