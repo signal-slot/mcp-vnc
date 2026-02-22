@@ -69,10 +69,14 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
 
+          # Pre-populate AppDir with custom Qt plugins that linuxdeploy won't discover
+          mkdir -p AppDir/usr/plugins/mcpserverbackend
+          cp build/qt_modules/plugins/mcpserverbackend/libqmcpserverstdio.so \
+             AppDir/usr/plugins/mcpserverbackend/
+
           export APPIMAGE_EXTRACT_AND_RUN=1
           export QMAKE=$(which qmake)
-          export LD_LIBRARY_PATH="${PWD}/build/qt_modules/lib:${PWD}/build/qt_modules/lib64:${LD_LIBRARY_PATH}"
-          export QT_PLUGIN_PATH="${PWD}/build/qt_modules/lib/qt6/plugins:${PWD}/build/qt_modules/lib64/qt6/plugins"
+          export LD_LIBRARY_PATH="${PWD}/build/qt_modules/lib:${LD_LIBRARY_PATH}"
           export EXTRA_QT_PLUGINS="platforms/libqoffscreen.so"
           export VERSION=${GITHUB_REF_NAME#v}
 
