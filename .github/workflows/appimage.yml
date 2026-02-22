@@ -84,6 +84,12 @@ jobs:
             --plugin qt \
             --output appimage
 
+          # linuxdeploy derives filename from desktop Name "MCP VNC" → MCP_VNC
+          # Rename to conventional lowercase-hyphenated form
+          for f in MCP_VNC-*.AppImage*; do
+            mv "$f" "${f/MCP_VNC/mcp-vnc}"
+          done
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
