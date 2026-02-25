@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.os == 'Windows' && 'C:/qt-static' || '~/qt-static' }}
-          key: qt-static-6.8.2-${{ matrix.os }}-v2
+          key: qt-static-6.8.2-${{ matrix.os }}-v3
 
       - name: Download Qt source
         if: steps.cache-qt.outputs.cache-hit != 'true'
@@ -71,7 +71,7 @@ jobs:
         run: |
           cd qtbase-everywhere-src-6.8.2
           ./configure -static -release -prefix $HOME/qt-static \
-            -nomake tests -nomake examples -qt-zlib -xcb \
+            -nomake tests -nomake examples -xcb \
             -- -DFEATURE_cxx20=ON
           cmake --build . --parallel $(nproc)
           cmake --install .
@@ -81,7 +81,7 @@ jobs:
         run: |
           cd qtbase-everywhere-src-6.8.2
           ./configure -static -release -prefix $HOME/qt-static \
-            -nomake tests -nomake examples -qt-zlib \
+            -nomake tests -nomake examples \
             -- -DCMAKE_OSX_ARCHITECTURES=arm64 -DFEATURE_cxx20=ON
           cmake --build . --parallel $(sysctl -n hw.ncpu)
           cmake --install .
@@ -91,7 +91,7 @@ jobs:
         shell: cmd
         run: |
           cd qtbase-everywhere-src-6.8.2
-          CALL configure.bat -static -release -prefix C:\qt-static -nomake tests -nomake examples -qt-zlib -- -DFEATURE_cxx20=ON
+          CALL configure.bat -static -release -prefix C:\qt-static -nomake tests -nomake examples -- -DFEATURE_cxx20=ON
           cmake --build . --parallel
           cmake --install .
 
