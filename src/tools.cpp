@@ -47,6 +47,15 @@ public:
     bool readyForFrame = false;
     int recordingFps = 10;
 #endif
+
+    void updateFramebufferUpdates()
+    {
+        bool needed = previewEnabled;
+#ifdef HAVE_MULTIMEDIA
+        needed = needed || recording;
+#endif
+        vncClient.setFramebufferUpdatesEnabled(needed);
+    }
 };
 
 Tools::Tools(QObject *parent)
@@ -81,6 +90,12 @@ QVncClient *Tools::client() const
 void Tools::setPreviewWidget(VncWidget *widget)
 {
     d->previewWidget = widget;
+    if (widget) {
+        QObject::connect(widget, &VncWidget::closed, this, [this]() {
+            d->previewEnabled = false;
+            d->updateFramebufferUpdates();
+        });
+    }
 }
 
 void Tools::connect(const QString &host, int port, const QString &password)
@@ -336,7 +351,7 @@ void Tools::sendText(const QString &text)
 void Tools::setPreview(bool visible)
 {
     d->previewEnabled = visible;
-    d->vncClient.setFramebufferUpdatesEnabled(visible);
+    d->updateFramebufferUpdates();
     if (!d->previewWidget)
         return;
     if (visible && d->socket.state() == QTcpSocket::ConnectedState)
@@ -661,6 +676,7 @@ bool Tools::startRecording(const QString &filePath, int fps)
     d->recordingTimer->start();
 
     d->recording = true;
+    d->updateFramebufferUpdates();
     return true;
 }
 
@@ -683,6 +699,8 @@ bool Tools::stopRecording()
     d->recorder = nullptr;
     d->videoFrameInput->deleteLater();
     d->videoFrameInput = nullptr;
+
+    d->updateFramebufferUpdates();
 
     return true;
 }

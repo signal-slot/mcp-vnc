@@ -3,6 +3,7 @@
 
 #include "vncwidget.h"
 
+#include <QtGui/QCloseEvent>
 #include <QtGui/QPainter>
 #include <QtGui/QPaintEvent>
 #include <QtGui/QKeyEvent>
@@ -128,6 +129,12 @@ void VncWidget::mouseReleaseEvent(QMouseEvent *e)
     if (d->interactive && d->client) {
         d->client->handlePointerEvent(e);
     }
+}
+
+void VncWidget::closeEvent(QCloseEvent *e)
+{
+    emit closed();
+    QWidget::closeEvent(e);
 }
 
 void VncWidget::paintEvent(QPaintEvent *e)
