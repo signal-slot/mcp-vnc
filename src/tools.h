@@ -8,6 +8,7 @@
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
 #include <QtGui/QImage>
+#include <QtCore/QJsonObject>
 #include <QtMcpCommon/qmcpcalltoolresultcontent.h>
 
 class QVncClient;
@@ -42,12 +43,22 @@ public:
     Q_INVOKABLE void setInteractive(bool enabled);
     Q_INVOKABLE void setStaysOnTop(bool enabled);
     Q_INVOKABLE void setPreviewTitle(const QString &title);
+    // Macro tools
+    Q_INVOKABLE void setMacroDir(const QString &path);
+    Q_INVOKABLE bool createMacro(const QString &name, const QString &description = QString());
+    Q_INVOKABLE bool addMacroStep(const QString &name, const QString &action, const QString &params, int delay = 0);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> playMacro(const QString &name, int speedFactor = 100);
+    Q_INVOKABLE QStringList listMacros();
+    Q_INVOKABLE QString getMacro(const QString &name);
+    Q_INVOKABLE bool deleteMacro(const QString &name);
+
 #ifdef HAVE_MULTIMEDIA
     Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);
     Q_INVOKABLE bool stopRecording();
 #endif
 
 private:
+    void executeStep(const QString &action, const QJsonObject &params);
     class Private;
     QScopedPointer<Private> d;
 };

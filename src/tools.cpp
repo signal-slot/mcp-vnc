@@ -5,6 +5,12 @@
 #include "vncwidget.h"
 #include <QtVncClient/QVncClient>
 #include <QtNetwork/QTcpSocket>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QJsonParseError>
 #include <QtCore/QPromise>
 #include <QtCore/QSharedPointer>
 #include <QtCore/QTimer>
@@ -26,6 +32,10 @@ public:
     VncWidget *previewWidget = nullptr;
     bool previewEnabled = false;
     QPointF pos;
+
+    // Macro members
+    QString macroDir;
+    bool macroPlaying = false;
 
 #ifdef HAVE_MULTIMEDIA
     // Recording members
@@ -356,6 +366,244 @@ void Tools::setPreviewTitle(const QString &title)
     if (!d->previewWidget)
         return;
     d->previewWidget->setWindowTitle(title);
+}
+
+// --- Macro tools ---
+
+static const QStringList validActions = {
+    QStringLiteral("mouseMove"),
+    QStringLiteral("mouseClick"),
+    QStringLiteral("doubleClick"),
+    QStringLiteral("mousePress"),
+    QStringLiteral("mouseRelease"),
+    QStringLiteral("longPress"),
+    QStringLiteral("dragAndDrop"),
+    QStringLiteral("sendKey"),
+    QStringLiteral("sendText"),
+};
+
+void Tools::setMacroDir(const QString &path)
+{
+    d->macroDir = path;
+    QDir().mkpath(path);
+}
+
+bool Tools::createMacro(const QString &name, const QString &description)
+{
+    if (d->macroDir.isEmpty())
+        return false;
+
+    const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
+    if (QFile::exists(filePath))
+        return false;
+
+    QJsonObject obj;
+    obj[QStringLiteral("name")] = name;
+    obj[QStringLiteral("description")] = description;
+    obj[QStringLiteral("steps")] = QJsonArray();
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.write(QJsonDocument(obj).toJson());
+    return true;
+}
+
+bool Tools::addMacroStep(const QString &name, const QString &action, const QString &params, int delay)
+{
+    if (d->macroDir.isEmpty())
+        return false;
+    if (!validActions.contains(action))
+        return false;
+
+    const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly))
+        return false;
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    file.close();
+    if (parseError.error != QJsonParseError::NoError)
+        return false;
+
+    QJsonObject obj = doc.object();
+    QJsonArray steps = obj[QStringLiteral("steps")].toArray();
+
+    QJsonParseError paramError;
+    QJsonDocument paramDoc = QJsonDocument::fromJson(params.toUtf8(), &paramError);
+    if (paramError.error != QJsonParseError::NoError)
+        return false;
+
+    QJsonObject step;
+    step[QStringLiteral("action")] = action;
+    step[QStringLiteral("params")] = paramDoc.object();
+    step[QStringLiteral("delay")] = delay;
+    steps.append(step);
+
+    obj[QStringLiteral("steps")] = steps;
+
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.write(QJsonDocument(obj).toJson());
+    return true;
+}
+
+void Tools::executeStep(const QString &action, const QJsonObject &params)
+{
+    if (action == QLatin1String("mouseMove")) {
+        mouseMove(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                  params[QStringLiteral("button")].toInt(0));
+    } else if (action == QLatin1String("mouseClick")) {
+        mouseClick(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                   params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("doubleClick")) {
+        doubleClick(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                    params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("mousePress")) {
+        mousePress(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                   params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("mouseRelease")) {
+        mouseRelease(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                     params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("longPress")) {
+        longPress(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                  params[QStringLiteral("duration")].toInt(1000),
+                  params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("dragAndDrop")) {
+        dragAndDrop(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+                    params[QStringLiteral("button")].toInt(1));
+    } else if (action == QLatin1String("sendKey")) {
+        sendKey(params[QStringLiteral("keysym")].toInt(), params[QStringLiteral("down")].toBool());
+    } else if (action == QLatin1String("sendText")) {
+        sendText(params[QStringLiteral("text")].toString());
+    }
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::playMacro(const QString &name, int speedFactor)
+{
+    if (d->macroDir.isEmpty() || d->macroPlaying) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            d->macroPlaying ? QStringLiteral("Error: another macro is already playing")
+                            : QStringLiteral("Error: macro directory not set"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: macro '%1' not found").arg(name))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    file.close();
+    if (parseError.error != QJsonParseError::NoError) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: invalid macro JSON"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    QJsonArray steps = doc.object()[QStringLiteral("steps")].toArray();
+    if (steps.isEmpty()) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Macro completed: 0 steps executed"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    d->macroPlaying = true;
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+
+    auto stepsPtr = QSharedPointer<QJsonArray>::create(steps);
+    auto indexPtr = QSharedPointer<int>::create(0);
+    auto factor = qMax(1, speedFactor);
+
+    // Use a recursive lambda via std::function to chain steps with QTimer::singleShot
+    auto executeNext = QSharedPointer<std::function<void()>>::create();
+    *executeNext = [this, promise, stepsPtr, indexPtr, factor, executeNext]() {
+        if (*indexPtr >= stepsPtr->size()) {
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(
+                QStringLiteral("Macro completed: %1 steps executed").arg(stepsPtr->size()))));
+            promise->addResult(content);
+            promise->finish();
+            d->macroPlaying = false;
+            return;
+        }
+
+        QJsonObject step = stepsPtr->at(*indexPtr).toObject();
+        int delay = step[QStringLiteral("delay")].toInt(0) * 100 / factor;
+        QString action = step[QStringLiteral("action")].toString();
+        QJsonObject params = step[QStringLiteral("params")].toObject();
+        (*indexPtr)++;
+
+        QTimer::singleShot(delay, this, [this, action, params, executeNext]() {
+            executeStep(action, params);
+            // Yield to event loop before next step (even with delay=0)
+            QTimer::singleShot(0, this, [executeNext]() {
+                (*executeNext)();
+            });
+        });
+    };
+
+    // Kick off the first step
+    (*executeNext)();
+
+    return promise->future();
+}
+
+QStringList Tools::listMacros()
+{
+    if (d->macroDir.isEmpty())
+        return {};
+
+    QDir dir(d->macroDir);
+    QStringList files = dir.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
+    QStringList names;
+    for (const QString &file : files)
+        names.append(file.chopped(5)); // remove ".json"
+    return names;
+}
+
+QString Tools::getMacro(const QString &name)
+{
+    if (d->macroDir.isEmpty())
+        return {};
+
+    const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly))
+        return {};
+    return QString::fromUtf8(file.readAll());
+}
+
+bool Tools::deleteMacro(const QString &name)
+{
+    if (d->macroDir.isEmpty())
+        return false;
+
+    const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
+    return QFile::remove(filePath);
 }
 
 #ifdef HAVE_MULTIMEDIA
