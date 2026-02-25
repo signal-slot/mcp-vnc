@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
@@ -89,7 +90,7 @@ jobs:
         shell: cmd
         run: |
           cd qtbase-everywhere-src-6.8.2
-          configure.bat -static -release -prefix C:\qt-static -nomake tests -nomake examples -qt-zlib
+          CALL configure.bat -static -release -prefix C:\qt-static -nomake tests -nomake examples -qt-zlib
           cmake --build . --parallel
           cmake --install .
 
@@ -110,10 +111,12 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             export PATH="/c/qt-static/bin:$PATH"
+            PREFIX_PATH="C:/qt-static"
           else
             export PATH="$HOME/qt-static/bin:$PATH"
+            PREFIX_PATH="$HOME/qt-static"
           fi
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PREFIX_PATH" -G Ninja
           cmake --build build
 
       - name: Prepare artifact
