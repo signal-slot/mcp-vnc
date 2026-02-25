@@ -16,6 +16,8 @@
 #include <QtCore/QTimer>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QMouseEvent>
+#include <QtGui/QPainter>
+#include <QtGui/QPainterPath>
 #ifdef HAVE_MULTIMEDIA
 #include <QtMultimedia/QMediaCaptureSession>
 #include <QtMultimedia/QMediaFormat>
@@ -71,6 +73,9 @@ Tools::Tools(QObject *parent)
             d->previewWidget->show();
         else if (!connected)
             d->previewWidget->hide();
+    });
+    QObject::connect(&d->vncClient, &QVncClient::cursorPosChanged, this, [this](const QPoint &pos) {
+        d->pos = QPointF(pos);
     });
 }
 
@@ -133,12 +138,51 @@ static QList<QMcpCallToolResultContent> imageOrError(const QImage &image)
     return content;
 }
 
+static QImage compositeWithCursor(const QImage &framebuffer, const QVncClient *client, const QPointF &fallbackPos)
+{
+    if (framebuffer.isNull())
+        return framebuffer;
+
+    QImage result = framebuffer.copy();
+    QPainter painter(&result);
+
+    if (!client->cursorImage().isNull()) {
+        // Server provided cursor shape via RichCursor pseudo-encoding
+        const QPoint pos = client->cursorPos();
+        const QPoint hotspot = client->cursorHotspot();
+        painter.drawImage(pos - hotspot, client->cursorImage());
+    } else {
+        // Fallback: draw a simple arrow cursor at last known position
+        const int x = qRound(fallbackPos.x());
+        const int y = qRound(fallbackPos.y());
+
+        static const QPointF arrowShape[] = {
+            {0, 0}, {0, 12}, {3, 10}, {6, 15}, {8, 14}, {5, 9}, {9, 9}
+        };
+        QPainterPath path;
+        path.moveTo(arrowShape[0]);
+        for (int i = 1; i < 7; i++)
+            path.lineTo(arrowShape[i]);
+        path.closeSubpath();
+
+        painter.translate(x, y);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(Qt::black, 1));
+        painter.setBrush(Qt::white);
+        painter.drawPath(path);
+    }
+
+    painter.end();
+    return result;
+}
+
 QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int width, int height)
 {
     if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
         QPromise<QList<QMcpCallToolResultContent>> promise;
         promise.start();
-        promise.addResult(imageOrError(extractRegion(d->vncClient.image(), x, y, width, height)));
+        QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
+        promise.addResult(imageOrError(extractRegion(img, x, y, width, height)));
         promise.finish();
         return promise.future();
     }
@@ -151,7 +195,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int wi
         [this, promise, conn, x, y, width, height]() {
             QObject::disconnect(*conn);
             d->vncClient.setFramebufferUpdatesEnabled(false);
-            promise->addResult(imageOrError(extractRegion(d->vncClient.image(), x, y, width, height)));
+            QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
+            promise->addResult(imageOrError(extractRegion(img, x, y, width, height)));
             promise->finish();
         });
     return promise->future();
@@ -162,7 +207,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::save(const QString &filePath, i
     if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
         QPromise<QList<QMcpCallToolResultContent>> promise;
         promise.start();
-        bool ok = extractRegion(d->vncClient.image(), x, y, width, height).save(filePath);
+        QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
+        bool ok = extractRegion(img, x, y, width, height).save(filePath);
         QList<QMcpCallToolResultContent> content;
         content.append(QMcpCallToolResultContent(QMcpTextContent(ok ? QStringLiteral("true") : QStringLiteral("false"))));
         promise.addResult(content);
@@ -178,7 +224,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::save(const QString &filePath, i
         [this, promise, conn, filePath, x, y, width, height]() {
             QObject::disconnect(*conn);
             d->vncClient.setFramebufferUpdatesEnabled(false);
-            bool ok = extractRegion(d->vncClient.image(), x, y, width, height).save(filePath);
+            QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
+            bool ok = extractRegion(img, x, y, width, height).save(filePath);
             QList<QMcpCallToolResultContent> content;
             content.append(QMcpCallToolResultContent(QMcpTextContent(ok ? QStringLiteral("true") : QStringLiteral("false"))));
             promise->addResult(content);
@@ -666,7 +713,8 @@ bool Tools::startRecording(const QString &filePath, int fps)
         if (img.isNull())
             return;
         d->readyForFrame = false;
-        QVideoFrame frame(img.convertToFormat(QImage::Format_ARGB32));
+        QImage composited = compositeWithCursor(img, &d->vncClient, d->pos);
+        QVideoFrame frame(composited.convertToFormat(QImage::Format_ARGB32));
         frame.setStreamFrameRate(d->recordingFps);
         d->videoFrameInput->sendVideoFrame(frame);
     });

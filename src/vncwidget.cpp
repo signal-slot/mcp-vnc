@@ -40,6 +40,14 @@ void VncWidget::Private::paint(const QRect &rect)
     }
     
     p.drawImage(rect, client->image(), rect);
+
+    // Draw cursor overlay
+    const QImage &cursor = client->cursorImage();
+    if (!cursor.isNull()) {
+        const QPoint pos = client->cursorPos();
+        const QPoint hotspot = client->cursorHotspot();
+        p.drawImage(pos - hotspot, cursor);
+    }
 }
 
 VncWidget::VncWidget(QWidget *parent)
@@ -80,6 +88,13 @@ void VncWidget::setClient(QVncClient *client)
             repaint();
             if (connected)
                 window()->raise();
+        });
+
+        connect(client, &QVncClient::cursorChanged, this, [this]() {
+            update();
+        });
+        connect(client, &QVncClient::cursorPosChanged, this, [this]() {
+            update();
         });
     }
     
