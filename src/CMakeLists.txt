@@ -43,6 +43,10 @@ target_link_libraries(mcp-vnc PRIVATE
     Qt::McpServer
 )
 
+if(TARGET Qt6::QMcpServerStdioPlugin)
+    qt_import_plugins(mcp-vnc INCLUDE Qt6::QMcpServerStdioPlugin)
+endif()
+
 if(TARGET Qt::Multimedia)
     target_link_libraries(mcp-vnc PRIVATE Qt::Multimedia)
     target_compile_definitions(mcp-vnc PRIVATE HAVE_MULTIMEDIA)
