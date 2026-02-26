@@ -4,23 +4,25 @@ An MCP (Model Context Protocol) server that exposes VNC client operations as too
 
 ## Install
 
-### AppImage (Linux)
+Download the latest binary for your platform from [Releases](https://github.com/signal-slot/mcp-vnc/releases):
 
-Download the latest AppImage from [Releases](https://github.com/signal-slot/mcp-vnc/releases):
-
-```bash
-chmod +x mcp-vnc-*-x86_64.AppImage
-```
+| Platform | Binary |
+|----------|--------|
+| Linux x64 | `mcp-vnc-linux-x64` |
+| macOS arm64 | `mcp-vnc-macos-arm64` |
+| Windows x64 | `mcp-vnc-windows-x64.exe` |
 
 ```json
 {
   "mcpServers": {
     "vnc": {
-      "command": "/path/to/mcp-vnc-0.1.0-x86_64.AppImage"
+      "command": "/path/to/mcp-vnc-linux-x64"
     }
   }
 }
 ```
+
+An AppImage (`mcp-vnc-*-x86_64.AppImage`) is also available for Linux.
 
 ### Docker
 
@@ -99,6 +101,13 @@ docker run --rm -i --network=host mcp-vnc
 | `setStaysOnTop` | Toggle whether the preview window stays on top of other windows |
 | `startRecording` | Start recording the VNC screen to an MP4 file |
 | `stopRecording` | Stop the current screen recording |
+| `setMacroDir` | Set the directory where macros are saved and loaded from |
+| `createMacro` | Create a new empty macro with the given name |
+| `addMacroStep` | Add a step to an existing macro |
+| `playMacro` | Play a saved macro by executing all its steps sequentially |
+| `listMacros` | List all saved macros in the macro directory |
+| `getMacro` | Get the full JSON content of a macro |
+| `deleteMacro` | Delete a saved macro file |
 
 ## License
 
