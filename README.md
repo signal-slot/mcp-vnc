@@ -22,8 +22,6 @@ Download the latest binary for your platform from [Releases](https://github.com/
 }
 ```
 
-An AppImage (`mcp-vnc-*-x86_64.AppImage`) is also available for Linux.
-
 ### Docker
 
 ```bash
