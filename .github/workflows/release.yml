@@ -57,7 +57,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.os == 'Windows' && 'C:/qt-static' || '~/qt-static' }}
-          key: qt-static-6.8.2-${{ matrix.os }}-v5
+          key: qt-static-6.8.2-${{ matrix.os }}-v6
 
       - name: Download Qt source
         if: steps.cache-qt.outputs.cache-hit != 'true'
@@ -141,7 +141,7 @@ jobs:
         shell: cmd
         run: |
           cd qtshadertools-everywhere-src-6.8.2
-          C:\qt-static\bin\qt-configure-module .
+          CALL C:\qt-static\bin\qt-configure-module .
           cmake --build . --parallel
           cmake --install .
 
@@ -150,7 +150,7 @@ jobs:
         shell: cmd
         run: |
           cd qtmultimedia-everywhere-src-6.8.2
-          C:\qt-static\bin\qt-configure-module . -- -DFEATURE_ffmpeg=OFF
+          CALL C:\qt-static\bin\qt-configure-module . -- -DFEATURE_ffmpeg=OFF
           cmake --build . --parallel
           cmake --install .
 
