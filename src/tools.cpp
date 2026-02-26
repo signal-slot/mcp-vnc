@@ -103,11 +103,65 @@ void Tools::setPreviewWidget(VncWidget *widget)
     }
 }
 
-void Tools::connect(const QString &host, int port, const QString &password)
+QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, int port, const QString &password)
 {
     if (!password.isEmpty())
         d->vncClient.setPassword(password);
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+
+    // Temporarily enable framebuffer updates so the initial FramebufferUpdateRequest
+    // is sent during the ServerInit handshake phase.
+    d->vncClient.setFramebufferUpdatesEnabled(true);
+
+    auto connFb = QSharedPointer<QMetaObject::Connection>::create();
+    auto connErr = QSharedPointer<QMetaObject::Connection>::create();
+    auto connDisc = QSharedPointer<QMetaObject::Connection>::create();
+
+    // Wait for the first framebuffer update (handshake complete + pixel data received)
+    *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, connFb, connErr, connDisc]() {
+            QObject::disconnect(*connFb);
+            QObject::disconnect(*connErr);
+            QObject::disconnect(*connDisc);
+            d->updateFramebufferUpdates();
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(status())));
+            promise->addResult(content);
+            promise->finish();
+        });
+
+    // Handle socket errors
+    *connErr = QObject::connect(&d->socket, &QTcpSocket::errorOccurred, this,
+        [this, promise, connFb, connErr, connDisc](QAbstractSocket::SocketError) {
+            QObject::disconnect(*connFb);
+            QObject::disconnect(*connErr);
+            QObject::disconnect(*connDisc);
+            d->updateFramebufferUpdates();
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(
+                QStringLiteral("Error: %1").arg(d->socket.errorString()))));
+            promise->addResult(content);
+            promise->finish();
+        });
+
+    // Handle unexpected disconnection during handshake
+    *connDisc = QObject::connect(&d->socket, &QTcpSocket::disconnected, this,
+        [this, promise, connFb, connErr, connDisc]() {
+            QObject::disconnect(*connFb);
+            QObject::disconnect(*connErr);
+            QObject::disconnect(*connDisc);
+            d->updateFramebufferUpdates();
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(
+                QStringLiteral("Error: disconnected during handshake"))));
+            promise->addResult(content);
+            promise->finish();
+        });
+
     d->socket.connectToHost(host, port);
+    return promise->future();
 }
 
 void Tools::disconnect()
@@ -190,11 +244,21 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::screenshot(int x, int y, int wi
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
     d->vncClient.setFramebufferUpdatesEnabled(true);
-    auto conn = QSharedPointer<QMetaObject::Connection>::create();
-    *conn = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
-        [this, promise, conn, x, y, width, height]() {
-            QObject::disconnect(*conn);
-            d->vncClient.setFramebufferUpdatesEnabled(false);
+    auto hasImageData = QSharedPointer<bool>::create(false);
+    auto connImg = QSharedPointer<QMetaObject::Connection>::create();
+    auto connFb = QSharedPointer<QMetaObject::Connection>::create();
+    // Track when real pixel data arrives (not just cursor pseudo-encoding)
+    *connImg = QObject::connect(&d->vncClient, &QVncClient::imageChanged, this,
+        [hasImageData](const QRect &) {
+            *hasImageData = true;
+        });
+    *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, connImg, connFb, hasImageData, x, y, width, height]() {
+            if (!*hasImageData)
+                return; // cursor-only update, wait for real pixel data
+            QObject::disconnect(*connImg);
+            QObject::disconnect(*connFb);
+            d->updateFramebufferUpdates();
             QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
             promise->addResult(imageOrError(extractRegion(img, x, y, width, height)));
             promise->finish();
@@ -219,11 +283,21 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::save(const QString &filePath, i
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
     d->vncClient.setFramebufferUpdatesEnabled(true);
-    auto conn = QSharedPointer<QMetaObject::Connection>::create();
-    *conn = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
-        [this, promise, conn, filePath, x, y, width, height]() {
-            QObject::disconnect(*conn);
-            d->vncClient.setFramebufferUpdatesEnabled(false);
+    auto hasImageData = QSharedPointer<bool>::create(false);
+    auto connImg = QSharedPointer<QMetaObject::Connection>::create();
+    auto connFb = QSharedPointer<QMetaObject::Connection>::create();
+    // Track when real pixel data arrives (not just cursor pseudo-encoding)
+    *connImg = QObject::connect(&d->vncClient, &QVncClient::imageChanged, this,
+        [hasImageData](const QRect &) {
+            *hasImageData = true;
+        });
+    *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, connImg, connFb, hasImageData, filePath, x, y, width, height]() {
+            if (!*hasImageData)
+                return; // cursor-only update, wait for real pixel data
+            QObject::disconnect(*connImg);
+            QObject::disconnect(*connFb);
+            d->updateFramebufferUpdates();
             QImage img = compositeWithCursor(d->vncClient.image(), &d->vncClient, d->pos);
             bool ok = extractRegion(img, x, y, width, height).save(filePath);
             QList<QMcpCallToolResultContent> content;
