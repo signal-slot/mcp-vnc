@@ -111,20 +111,29 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, in
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
 
-    // Temporarily enable framebuffer updates so the initial FramebufferUpdateRequest
-    // is sent during the ServerInit handshake phase.
-    d->vncClient.setFramebufferUpdatesEnabled(true);
-
+    auto connTcp = QSharedPointer<QMetaObject::Connection>::create();
     auto connFb = QSharedPointer<QMetaObject::Connection>::create();
     auto connErr = QSharedPointer<QMetaObject::Connection>::create();
     auto connDisc = QSharedPointer<QMetaObject::Connection>::create();
 
+    auto cleanup = [connTcp, connFb, connErr, connDisc]() {
+        QObject::disconnect(*connTcp);
+        QObject::disconnect(*connFb);
+        QObject::disconnect(*connErr);
+        QObject::disconnect(*connDisc);
+    };
+
+    // Wait for TCP connection before enabling framebuffer updates.
+    // Enabling before connected triggers QVncClient read() on an unconnected socket → SIGSEGV.
+    *connTcp = QObject::connect(&d->socket, &QTcpSocket::connected, this,
+        [this]() {
+            d->vncClient.setFramebufferUpdatesEnabled(true);
+        });
+
     // Wait for the first framebuffer update (handshake complete + pixel data received)
     *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
-        [this, promise, connFb, connErr, connDisc]() {
-            QObject::disconnect(*connFb);
-            QObject::disconnect(*connErr);
-            QObject::disconnect(*connDisc);
+        [this, promise, cleanup]() {
+            cleanup();
             d->updateFramebufferUpdates();
             QList<QMcpCallToolResultContent> content;
             content.append(QMcpCallToolResultContent(QMcpTextContent(status())));
@@ -134,10 +143,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, in
 
     // Handle socket errors
     *connErr = QObject::connect(&d->socket, &QTcpSocket::errorOccurred, this,
-        [this, promise, connFb, connErr, connDisc](QAbstractSocket::SocketError) {
-            QObject::disconnect(*connFb);
-            QObject::disconnect(*connErr);
-            QObject::disconnect(*connDisc);
+        [this, promise, cleanup](QAbstractSocket::SocketError) {
+            cleanup();
             d->updateFramebufferUpdates();
             QList<QMcpCallToolResultContent> content;
             content.append(QMcpCallToolResultContent(QMcpTextContent(
@@ -148,10 +155,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, in
 
     // Handle unexpected disconnection during handshake
     *connDisc = QObject::connect(&d->socket, &QTcpSocket::disconnected, this,
-        [this, promise, connFb, connErr, connDisc]() {
-            QObject::disconnect(*connFb);
-            QObject::disconnect(*connErr);
-            QObject::disconnect(*connDisc);
+        [this, promise, cleanup]() {
+            cleanup();
             d->updateFramebufferUpdates();
             QList<QMcpCallToolResultContent> content;
             content.append(QMcpCallToolResultContent(QMcpTextContent(
