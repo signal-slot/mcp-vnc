@@ -41,7 +41,8 @@ jobs:
             libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-render-util0-dev \
             libxcb-cursor-dev libxcb-xinerama0-dev libxcb-xkb-dev \
             libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev libfreetype6-dev \
-            libglib2.0-dev zlib1g-dev
+            libglib2.0-dev zlib1g-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -56,7 +57,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.os == 'Windows' && 'C:/qt-static' || '~/qt-static' }}
-          key: qt-static-6.8.2-${{ matrix.os }}-v3
+          key: qt-static-6.8.2-${{ matrix.os }}-v4
 
       - name: Download Qt source
         if: steps.cache-qt.outputs.cache-hit != 'true'
@@ -65,6 +66,9 @@ jobs:
           curl -L -o qtbase.tar.xz \
             https://download.qt.io/official_releases/qt/6.8/6.8.2/submodules/qtbase-everywhere-src-6.8.2.tar.xz
           tar xf qtbase.tar.xz
+          curl -L -o qtmultimedia.tar.xz \
+            https://download.qt.io/official_releases/qt/6.8/6.8.2/submodules/qtmultimedia-everywhere-src-6.8.2.tar.xz
+          tar xf qtmultimedia.tar.xz
 
       - name: Build static Qt (Linux)
         if: steps.cache-qt.outputs.cache-hit != 'true' && runner.os == 'Linux'
@@ -73,6 +77,14 @@ jobs:
           ./configure -static -release -prefix $HOME/qt-static \
             -nomake tests -nomake examples -xcb \
             -- -DFEATURE_cxx20=ON
+          cmake --build . --parallel $(nproc)
+          cmake --install .
+
+      - name: Build static Qt Multimedia (Linux)
+        if: steps.cache-qt.outputs.cache-hit != 'true' && runner.os == 'Linux'
+        run: |
+          cd qtmultimedia-everywhere-src-6.8.2
+          $HOME/qt-static/bin/qt-configure-module .
           cmake --build . --parallel $(nproc)
           cmake --install .
 
@@ -86,12 +98,30 @@ jobs:
           cmake --build . --parallel $(sysctl -n hw.ncpu)
           cmake --install .
 
+      - name: Build static Qt Multimedia (macOS)
+        if: steps.cache-qt.outputs.cache-hit != 'true' && runner.os == 'macOS'
+        run: |
+          cd qtmultimedia-everywhere-src-6.8.2
+          $HOME/qt-static/bin/qt-configure-module . -- \
+            -DFEATURE_ffmpeg=OFF -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake --build . --parallel $(sysctl -n hw.ncpu)
+          cmake --install .
+
       - name: Build static Qt (Windows)
         if: steps.cache-qt.outputs.cache-hit != 'true' && runner.os == 'Windows'
         shell: cmd
         run: |
           cd qtbase-everywhere-src-6.8.2
           CALL configure.bat -static -release -prefix C:\qt-static -nomake tests -nomake examples -- -DFEATURE_cxx20=ON
+          cmake --build . --parallel
+          cmake --install .
+
+      - name: Build static Qt Multimedia (Windows)
+        if: steps.cache-qt.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cd qtmultimedia-everywhere-src-6.8.2
+          C:\qt-static\bin\qt-configure-module . -- -DFEATURE_ffmpeg=OFF
           cmake --build . --parallel
           cmake --install .
 
