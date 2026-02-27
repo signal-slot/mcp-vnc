@@ -432,7 +432,7 @@ void Tools::longPress(int x, int y, int duration, int button)
     });
 }
 
-void Tools::dragAndDrop(int x, int y, int button)
+QFuture<QList<QMcpCallToolResultContent>> Tools::dragAndDrop(int x, int y, int button)
 {
     Qt::MouseButton qtButton = Qt::LeftButton;
     if (button == 2)
@@ -446,15 +446,30 @@ void Tools::dragAndDrop(int x, int y, int button)
     QMouseEvent pressEvent(QEvent::MouseButtonPress, d->pos, d->pos, qtButton, qtButton, Qt::NoModifier);
     d->vncClient.handlePointerEvent(&pressEvent);
 
-    // Move to end position with button held
-    QMouseEvent moveEvent(QEvent::MouseMove, endPos, endPos, Qt::NoButton, qtButton, Qt::NoModifier);
-    d->vncClient.handlePointerEvent(&moveEvent);
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
 
-    // Release at end position
-    QMouseEvent releaseEvent(QEvent::MouseButtonRelease, endPos, endPos, qtButton, Qt::NoButton, Qt::NoModifier);
-    d->vncClient.handlePointerEvent(&releaseEvent);
+    // Delay between press and move so the remote app can enter drag mode
+    QTimer::singleShot(100, this, [this, promise, endPos, qtButton]() {
+        // Move to end position with button held
+        QMouseEvent moveEvent(QEvent::MouseMove, endPos, endPos, Qt::NoButton, qtButton, Qt::NoModifier);
+        d->vncClient.handlePointerEvent(&moveEvent);
 
-    d->pos = endPos;
+        // Delay between move and release
+        QTimer::singleShot(50, this, [this, promise, endPos, qtButton]() {
+            // Release at end position
+            QMouseEvent releaseEvent(QEvent::MouseButtonRelease, endPos, endPos, qtButton, Qt::NoButton, Qt::NoModifier);
+            d->vncClient.handlePointerEvent(&releaseEvent);
+
+            d->pos = endPos;
+
+            QList<QMcpCallToolResultContent> content;
+            promise->addResult(content);
+            promise->finish();
+        });
+    });
+
+    return promise->future();
 }
 
 void Tools::sendKey(int keysym, bool down)
