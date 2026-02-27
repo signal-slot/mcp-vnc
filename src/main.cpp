@@ -295,6 +295,7 @@ int main(int argc, char *argv[])
         }
     });
 
+    QObject::connect(&server, &QMcpServer::finished, &app, &QCoreApplication::quit);
     server.start();
 
     VncWidget vncWidget;
