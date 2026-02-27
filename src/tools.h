@@ -38,6 +38,7 @@ public:
     Q_INVOKABLE void longPress(int x, int y, int duration = 1000, int button = 1);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> dragAndDrop(int x, int y, int button = 1);
     Q_INVOKABLE void sendKey(int keysym, bool down);
+    Q_INVOKABLE void sendKey(const QString &keysym, bool down);
     Q_INVOKABLE void sendText(const QString &text);
     Q_INVOKABLE void setPreview(bool visible);
     Q_INVOKABLE void setInteractive(bool enabled);

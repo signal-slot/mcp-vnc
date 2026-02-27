@@ -478,6 +478,14 @@ void Tools::sendKey(int keysym, bool down)
     d->vncClient.handleKeyEvent(&event);
 }
 
+void Tools::sendKey(const QString &keysym, bool down)
+{
+    bool ok;
+    int value = keysym.toInt(&ok, 0);
+    if (ok)
+        sendKey(value, down);
+}
+
 void Tools::sendText(const QString &text)
 {
     for (const QChar &ch : text) {
@@ -630,7 +638,11 @@ void Tools::executeStep(const QString &action, const QJsonObject &params)
         dragAndDrop(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
                     params[QStringLiteral("button")].toInt(1));
     } else if (action == QLatin1String("sendKey")) {
-        sendKey(params[QStringLiteral("keysym")].toInt(), params[QStringLiteral("down")].toBool());
+        const auto keysymValue = params[QStringLiteral("keysym")];
+        if (keysymValue.isString())
+            sendKey(keysymValue.toString(), params[QStringLiteral("down")].toBool());
+        else
+            sendKey(keysymValue.toInt(), params[QStringLiteral("down")].toBool());
     } else if (action == QLatin1String("sendText")) {
         sendText(params[QStringLiteral("text")].toString());
     }
