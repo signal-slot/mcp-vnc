@@ -97,6 +97,12 @@ docker run --rm -i --network=host mcp-vnc
 | `setPreviewTitle` | Set the title of the preview window |
 | `setInteractive` | Enable/disable forwarding input from the preview window to the VNC server |
 | `setStaysOnTop` | Toggle whether the preview window stays on top of other windows |
+| `checkPixelColor` | Check if a pixel matches an expected color |
+| `waitForColor` | Poll a pixel until it matches a color (with timeout) |
+| `setClipboard` | Send text to the remote clipboard |
+| `getClipboard` | Receive text from the remote clipboard |
+| `setClipboardImage` | Send an image to the remote clipboard (Extended Clipboard DIB) |
+| `getClipboardImage` | Receive an image from the remote clipboard (Extended Clipboard DIB) |
 | `startRecording` | Start recording the VNC screen to an MP4 file |
 | `stopRecording` | Stop the current screen recording |
 | `setMacroDir` | Set the directory where macros are saved and loaded from |
