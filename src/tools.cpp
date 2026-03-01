@@ -934,6 +934,54 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, cons
     return promise->future();
 }
 
+void Tools::setClipboard(const QString &text)
+{
+    d->vncClient.sendClipboardText(text);
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboard(int timeout)
+{
+    if (d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: not connected"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+
+    auto conn = QSharedPointer<QMetaObject::Connection>::create();
+    auto timeoutTimer = new QTimer(this);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeout);
+
+    *conn = QObject::connect(&d->vncClient, &QVncClient::clipboardTextReceived, this,
+        [promise, conn, timeoutTimer](const QString &text) {
+            QObject::disconnect(*conn);
+            timeoutTimer->stop();
+            timeoutTimer->deleteLater();
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(text)));
+            promise->addResult(content);
+            promise->finish();
+        });
+
+    QObject::connect(timeoutTimer, &QTimer::timeout, this, [promise, conn]() {
+        QObject::disconnect(*conn);
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: no clipboard data received within timeout"))));
+        promise->addResult(content);
+        promise->finish();
+    });
+
+    timeoutTimer->start();
+    return promise->future();
+}
+
 #ifdef HAVE_MULTIMEDIA
 bool Tools::startRecording(const QString &filePath, int fps)
 {

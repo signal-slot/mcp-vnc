@@ -57,6 +57,10 @@ public:
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> checkPixelColor(int x, int y, const QString &color);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> waitForColor(int x, int y, const QString &color, int timeout = 30000);
 
+    // Clipboard tools
+    Q_INVOKABLE void setClipboard(const QString &text);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> getClipboard(int timeout = 5000);
+
 #ifdef HAVE_MULTIMEDIA
     Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);
     Q_INVOKABLE bool stopRecording();

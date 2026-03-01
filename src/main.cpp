@@ -114,6 +114,10 @@ int main(int argc, char *argv[])
         { "waitForColor/y", "Y coordinate of the pixel to monitor in pixels" },
         { "waitForColor/color", "Expected color in hex format (e.g., \"#FF0000\" for red, \"#FFFFFF\" for white). Compared using RGB values, alpha is ignored." },
         { "waitForColor/timeout", "Maximum time to wait in milliseconds (default: 30000, i.e., 30 seconds). Returns a timeout error if the color does not match within this duration." },
+        { "setClipboard", "Send text to the VNC server's clipboard via the ClientCutText protocol message. The text will be available for pasting on the remote system." },
+        { "setClipboard/text", "The text to send to the remote clipboard" },
+        { "getClipboard", "Request and wait for the VNC server's clipboard text via the ServerCutText protocol message. Returns the clipboard text if received within the timeout, or an error message on timeout. Note: the server must actively send its clipboard content (e.g., when the user copies text on the remote system)." },
+        { "getClipboard/timeout", "Maximum time to wait for clipboard data in milliseconds (default: 5000, i.e., 5 seconds)" },
 #ifdef HAVE_MULTIMEDIA
         { "startRecording", "Start recording the VNC screen to an H.264/MP4 video file. The recording captures frames at the specified FPS rate until stopRecording is called. Requires an active VNC connection with a valid framebuffer. Returns false if already recording, not connected, or no framebuffer is available." },
         { "startRecording/filePath", "Absolute file path for the output MP4 file (e.g., /tmp/recording.mp4). The directory must exist. The file will be overwritten if it already exists." },
