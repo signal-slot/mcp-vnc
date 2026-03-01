@@ -982,6 +982,54 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboard(int timeout)
     return promise->future();
 }
 
+void Tools::setClipboardImage(const QString &filePath)
+{
+    QImage image(filePath);
+    if (!image.isNull())
+        d->vncClient.sendClipboardImage(image);
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboardImage(int timeout)
+{
+    if (d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: not connected"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+
+    auto conn = QSharedPointer<QMetaObject::Connection>::create();
+    auto timeoutTimer = new QTimer(this);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeout);
+
+    *conn = QObject::connect(&d->vncClient, &QVncClient::clipboardImageReceived, this,
+        [promise, conn, timeoutTimer](const QImage &image) {
+            QObject::disconnect(*conn);
+            timeoutTimer->stop();
+            timeoutTimer->deleteLater();
+            promise->addResult(imageOrError(image));
+            promise->finish();
+        });
+
+    QObject::connect(timeoutTimer, &QTimer::timeout, this, [promise, conn]() {
+        QObject::disconnect(*conn);
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: no clipboard image received within timeout"))));
+        promise->addResult(content);
+        promise->finish();
+    });
+
+    timeoutTimer->start();
+    return promise->future();
+}
+
 #ifdef HAVE_MULTIMEDIA
 bool Tools::startRecording(const QString &filePath, int fps)
 {

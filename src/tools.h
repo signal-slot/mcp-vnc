@@ -60,6 +60,8 @@ public:
     // Clipboard tools
     Q_INVOKABLE void setClipboard(const QString &text);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> getClipboard(int timeout = 5000);
+    Q_INVOKABLE void setClipboardImage(const QString &filePath);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> getClipboardImage(int timeout = 5000);
 
 #ifdef HAVE_MULTIMEDIA
     Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);

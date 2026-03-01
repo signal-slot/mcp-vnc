@@ -118,6 +118,10 @@ int main(int argc, char *argv[])
         { "setClipboard/text", "The text to send to the remote clipboard" },
         { "getClipboard", "Request and wait for the VNC server's clipboard text via the ServerCutText protocol message. Returns the clipboard text if received within the timeout, or an error message on timeout. Note: the server must actively send its clipboard content (e.g., when the user copies text on the remote system)." },
         { "getClipboard/timeout", "Maximum time to wait for clipboard data in milliseconds (default: 5000, i.e., 5 seconds)" },
+        { "setClipboardImage", "Send an image file to the VNC server's clipboard via the Extended Clipboard protocol (DIB format). The image will be available for pasting on the remote system. Requires Extended Clipboard support on the server." },
+        { "setClipboardImage/filePath", "Absolute file path of the image to send (e.g., /tmp/image.png). Supports PNG, JPG, BMP, and other Qt-supported image formats." },
+        { "getClipboardImage", "Wait for the VNC server to send a clipboard image via the Extended Clipboard protocol (DIB format). Returns the image as base64-encoded data if received within the timeout, or an error message on timeout." },
+        { "getClipboardImage/timeout", "Maximum time to wait for clipboard image in milliseconds (default: 5000, i.e., 5 seconds)" },
 #ifdef HAVE_MULTIMEDIA
         { "startRecording", "Start recording the VNC screen to an H.264/MP4 video file. The recording captures frames at the specified FPS rate until stopRecording is called. Requires an active VNC connection with a valid framebuffer. Returns false if already recording, not connected, or no framebuffer is available." },
         { "startRecording/filePath", "Absolute file path for the output MP4 file (e.g., /tmp/recording.mp4). The directory must exist. The file will be overwritten if it already exists." },
