@@ -105,6 +105,11 @@ int main(int argc, char *argv[])
         { "getMacro/name", "Name of the macro to retrieve" },
         { "deleteMacro", "Delete a saved macro file. Returns true if the file was successfully removed." },
         { "deleteMacro/name", "Name of the macro to delete" },
+        { "waitForColor", "Poll the pixel color at a specific coordinate every second until it matches the expected color, then return a full screenshot. Returns a timeout error message if the color does not match within the specified duration. Useful for waiting until a UI element changes state (e.g., loading indicator disappears, button becomes active)." },
+        { "waitForColor/x", "X coordinate of the pixel to monitor in pixels" },
+        { "waitForColor/y", "Y coordinate of the pixel to monitor in pixels" },
+        { "waitForColor/color", "Expected color in hex format (e.g., \"#FF0000\" for red, \"#FFFFFF\" for white). Compared using RGB values, alpha is ignored." },
+        { "waitForColor/timeout", "Maximum time to wait in milliseconds (default: 30000, i.e., 30 seconds). Returns a timeout error if the color does not match within this duration." },
 #ifdef HAVE_MULTIMEDIA
         { "startRecording", "Start recording the VNC screen to an H.264/MP4 video file. The recording captures frames at the specified FPS rate until stopRecording is called. Requires an active VNC connection with a valid framebuffer. Returns false if already recording, not connected, or no framebuffer is available." },
         { "startRecording/filePath", "Absolute file path for the output MP4 file (e.g., /tmp/recording.mp4). The directory must exist. The file will be overwritten if it already exists." },

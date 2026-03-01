@@ -544,6 +544,7 @@ static const QStringList validActions = {
     QStringLiteral("dragAndDrop"),
     QStringLiteral("sendKey"),
     QStringLiteral("sendText"),
+    QStringLiteral("waitForColor"),
 };
 
 void Tools::setMacroDir(const QString &path)
@@ -613,7 +614,7 @@ bool Tools::addMacroStep(const QString &name, const QString &action, const QStri
     return true;
 }
 
-void Tools::executeStep(const QString &action, const QJsonObject &params)
+void Tools::executeStep(const QString &action, const QJsonObject &params, std::function<void()> onCompleted)
 {
     if (action == QLatin1String("mouseMove")) {
         mouseMove(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
@@ -635,8 +636,12 @@ void Tools::executeStep(const QString &action, const QJsonObject &params)
                   params[QStringLiteral("duration")].toInt(1000),
                   params[QStringLiteral("button")].toInt(1));
     } else if (action == QLatin1String("dragAndDrop")) {
-        dragAndDrop(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
+        auto future = dragAndDrop(params[QStringLiteral("x")].toInt(), params[QStringLiteral("y")].toInt(),
                     params[QStringLiteral("button")].toInt(1));
+        future.then(this, [onCompleted](const QList<QMcpCallToolResultContent> &) {
+            onCompleted();
+        });
+        return;
     } else if (action == QLatin1String("sendKey")) {
         const auto keysymValue = params[QStringLiteral("keysym")];
         if (keysymValue.isString())
@@ -645,7 +650,18 @@ void Tools::executeStep(const QString &action, const QJsonObject &params)
             sendKey(keysymValue.toInt(), params[QStringLiteral("down")].toBool());
     } else if (action == QLatin1String("sendText")) {
         sendText(params[QStringLiteral("text")].toString());
+    } else if (action == QLatin1String("waitForColor")) {
+        auto future = waitForColor(
+            params[QStringLiteral("x")].toInt(),
+            params[QStringLiteral("y")].toInt(),
+            params[QStringLiteral("color")].toString(),
+            params[QStringLiteral("timeout")].toInt(30000));
+        future.then(this, [onCompleted](const QList<QMcpCallToolResultContent> &) {
+            onCompleted();
+        });
+        return;
     }
+    onCompleted();
 }
 
 QFuture<QList<QMcpCallToolResultContent>> Tools::playMacro(const QString &name, int speedFactor)
@@ -726,10 +742,11 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::playMacro(const QString &name, 
         (*indexPtr)++;
 
         QTimer::singleShot(delay, this, [this, action, params, executeNext]() {
-            executeStep(action, params);
-            // Yield to event loop before next step (even with delay=0)
-            QTimer::singleShot(0, this, [executeNext]() {
-                (*executeNext)();
+            executeStep(action, params, [this, executeNext]() {
+                // Yield to event loop before next step (even with delay=0)
+                QTimer::singleShot(0, this, [executeNext]() {
+                    (*executeNext)();
+                });
             });
         });
     };
@@ -772,6 +789,85 @@ bool Tools::deleteMacro(const QString &name)
 
     const QString filePath = d->macroDir + QLatin1Char('/') + name + QStringLiteral(".json");
     return QFile::remove(filePath);
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, const QString &color, int timeout)
+{
+    const QColor targetColor(color);
+
+    if (!targetColor.isValid()) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            QStringLiteral("Error: invalid color format '%1'. Use hex format like \"#FF0000\".").arg(color))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    if (d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: not connected"))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+
+    d->vncClient.setFramebufferUpdatesEnabled(true);
+
+    auto pollTimer = new QTimer(this);
+    auto timeoutTimer = new QTimer(this);
+    pollTimer->setInterval(1000);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeout);
+
+    auto cleanup = [this, pollTimer, timeoutTimer]() {
+        pollTimer->stop();
+        timeoutTimer->stop();
+        pollTimer->deleteLater();
+        timeoutTimer->deleteLater();
+        d->updateFramebufferUpdates();
+    };
+
+    QObject::connect(pollTimer, &QTimer::timeout, this, [this, promise, cleanup, x, y, targetColor]() {
+        const QImage &image = d->vncClient.image();
+        if (image.isNull())
+            return;
+        if (x < 0 || x >= image.width() || y < 0 || y >= image.height())
+            return;
+        if (QColor(image.pixel(x, y)).rgb() == targetColor.rgb()) {
+            cleanup();
+            QImage img = compositeWithCursor(image, &d->vncClient, d->pos);
+            promise->addResult(imageOrError(img));
+            promise->finish();
+        }
+    });
+
+    QObject::connect(timeoutTimer, &QTimer::timeout, this, [this, promise, cleanup, x, y, color, timeout]() {
+        cleanup();
+        const QImage &image = d->vncClient.image();
+        QColor actual;
+        if (!image.isNull() && x >= 0 && x < image.width() && y >= 0 && y < image.height())
+            actual = QColor(image.pixel(x, y));
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            QStringLiteral("Timeout: color at (%1, %2) did not become %3 within %4 ms. Actual color: %5")
+                .arg(x).arg(y).arg(color).arg(timeout)
+                .arg(actual.isValid() ? actual.name() : QStringLiteral("unknown")))));
+        promise->addResult(content);
+        promise->finish();
+    });
+
+    pollTimer->start();
+    timeoutTimer->start();
+
+    return promise->future();
 }
 
 #ifdef HAVE_MULTIMEDIA

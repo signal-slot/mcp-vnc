@@ -4,6 +4,7 @@
 #ifndef TOOLS_H
 #define TOOLS_H
 
+#include <functional>
 #include <QtCore/QFuture>
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
@@ -53,13 +54,15 @@ public:
     Q_INVOKABLE QString getMacro(const QString &name);
     Q_INVOKABLE bool deleteMacro(const QString &name);
 
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> waitForColor(int x, int y, const QString &color, int timeout = 30000);
+
 #ifdef HAVE_MULTIMEDIA
     Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);
     Q_INVOKABLE bool stopRecording();
 #endif
 
 private:
-    void executeStep(const QString &action, const QJsonObject &params);
+    void executeStep(const QString &action, const QJsonObject &params, std::function<void()> onCompleted);
     class Private;
     QScopedPointer<Private> d;
 };
