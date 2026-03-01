@@ -791,6 +791,70 @@ bool Tools::deleteMacro(const QString &name)
     return QFile::remove(filePath);
 }
 
+static QList<QMcpCallToolResultContent> checkPixelColorResult(const QImage &image, int x, int y, const QColor &targetColor)
+{
+    QList<QMcpCallToolResultContent> content;
+    if (image.isNull()) {
+        content.append(QMcpCallToolResultContent(QMcpTextContent(QStringLiteral("Error: no framebuffer available"))));
+    } else if (x < 0 || x >= image.width() || y < 0 || y >= image.height()) {
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            QStringLiteral("Error: coordinate (%1, %2) is out of bounds (%3x%4)")
+                .arg(x).arg(y).arg(image.width()).arg(image.height()))));
+    } else {
+        const QColor actual(image.pixel(x, y));
+        const bool match = actual.rgb() == targetColor.rgb();
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            match ? QStringLiteral("true")
+                  : QStringLiteral("false (actual: %1)").arg(actual.name()))));
+    }
+    return content;
+}
+
+QFuture<QList<QMcpCallToolResultContent>> Tools::checkPixelColor(int x, int y, const QString &color)
+{
+    const QColor targetColor(color);
+    if (!targetColor.isValid()) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(
+            QStringLiteral("Error: invalid color format '%1'. Use hex format like \"#FF0000\".").arg(color))));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
+    if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        promise.addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor));
+        promise.finish();
+        return promise.future();
+    }
+
+    auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
+    promise->start();
+    d->vncClient.setFramebufferUpdatesEnabled(true);
+    auto hasImageData = QSharedPointer<bool>::create(false);
+    auto connImg = QSharedPointer<QMetaObject::Connection>::create();
+    auto connFb = QSharedPointer<QMetaObject::Connection>::create();
+    *connImg = QObject::connect(&d->vncClient, &QVncClient::imageChanged, this,
+        [hasImageData](const QRect &) {
+            *hasImageData = true;
+        });
+    *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
+        [this, promise, connImg, connFb, hasImageData, x, y, targetColor]() {
+            if (!*hasImageData)
+                return;
+            QObject::disconnect(*connImg);
+            QObject::disconnect(*connFb);
+            d->updateFramebufferUpdates();
+            promise->addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor));
+            promise->finish();
+        });
+    return promise->future();
+}
+
 QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, const QString &color, int timeout)
 {
     const QColor targetColor(color);

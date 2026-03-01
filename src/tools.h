@@ -54,6 +54,7 @@ public:
     Q_INVOKABLE QString getMacro(const QString &name);
     Q_INVOKABLE bool deleteMacro(const QString &name);
 
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> checkPixelColor(int x, int y, const QString &color);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> waitForColor(int x, int y, const QString &color, int timeout = 30000);
 
 #ifdef HAVE_MULTIMEDIA
