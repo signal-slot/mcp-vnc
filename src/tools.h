@@ -68,6 +68,9 @@ public:
     Q_INVOKABLE bool stopRecording();
 #endif
 
+signals:
+    void disconnected();
+
 private:
     void executeStep(const QString &action, const QJsonObject &params, std::function<void()> onCompleted);
     class Private;

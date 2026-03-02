@@ -9,8 +9,10 @@ Q_IMPORT_PLUGIN(QMcpServerStdioPlugin)
 #include <QtWidgets/QApplication>
 #include <QtMcpServer/QMcpServer>
 #include <QtMcpServer/QMcpServerSession>
+#include <QtMcpCommon/QMcpLoggingMessageNotification>
 #include <QtMcpCommon/QMcpPrompt>
 #include <QtMcpCommon/QMcpPromptMessage>
+#include <QtMcpCommon/QMcpServerCapabilities>
 #include <QtMcpCommon/QMcpTextContent>
 #include "tools.h"
 #include "vncwidget.h"
@@ -128,6 +130,22 @@ int main(int argc, char *argv[])
         { "startRecording/fps", "Frames per second for the recording (default: 10, range: 1-60). Higher values produce smoother video but larger files. 10 FPS is usually sufficient for UI interaction recordings." },
         { "stopRecording", "Stop the current screen recording and finalize the MP4 file. The video file is written and closed when this is called. Returns false if no recording is in progress." },
 #endif
+    });
+    {
+        QMcpServerCapabilities capabilities;
+        capabilities.setLogging({});
+        server.setCapabilities(capabilities);
+    }
+    QObject::connect(tools, &Tools::disconnected, &server, [&server]() {
+        QMcpLoggingMessageNotification notification;
+        auto params = notification.params();
+        params.setLevel(QMcpLoggingLevel::warning);
+        params.setLogger("mcp-vnc"_L1);
+        params.setData(QJsonValue("VNC server disconnected"_L1));
+        notification.setParams(params);
+        const auto sessions = server.sessions();
+        for (auto *session : sessions)
+            server.notify(session->sessionId(), notification);
     });
     QObject::connect(&server, &QMcpServer::newSession, [](QMcpServerSession *session) {
         // setup-qt prompt

@@ -33,6 +33,7 @@ public:
     QVncClient vncClient;
     VncWidget *previewWidget = nullptr;
     bool previewEnabled = false;
+    bool wasConnected = false;
     QPointF pos;
 
     // Macro members
@@ -67,6 +68,9 @@ Tools::Tools(QObject *parent)
     d->vncClient.setSocket(&d->socket);
     d->vncClient.setFramebufferUpdatesEnabled(false);
     QObject::connect(&d->vncClient, &QVncClient::connectionStateChanged, this, [this](bool connected) {
+        if (!connected && d->wasConnected)
+            emit disconnected();
+        d->wasConnected = connected;
         if (!d->previewWidget)
             return;
         if (connected && d->previewEnabled)
