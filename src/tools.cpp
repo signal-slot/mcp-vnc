@@ -478,8 +478,16 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::dragAndDrop(int x, int y, int b
 
 void Tools::sendKey(int keysym, bool down)
 {
-    QKeyEvent event(down ? QEvent::KeyPress : QEvent::KeyRelease, keysym, Qt::NoModifier);
-    d->vncClient.handleKeyEvent(&event);
+    if (d->socket.state() != QTcpSocket::ConnectedState)
+        return;
+    const quint8 messageType = 0x04;
+    const quint8 downFlag = down ? 1 : 0;
+    const quint8 padding[2] = {0, 0};
+    const quint32 key = qToBigEndian(static_cast<quint32>(keysym));
+    d->socket.write(reinterpret_cast<const char *>(&messageType), 1);
+    d->socket.write(reinterpret_cast<const char *>(&downFlag), 1);
+    d->socket.write(reinterpret_cast<const char *>(padding), 2);
+    d->socket.write(reinterpret_cast<const char *>(&key), 4);
 }
 
 void Tools::sendKey(const QString &keysym, bool down)
