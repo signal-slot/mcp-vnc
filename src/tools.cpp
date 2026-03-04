@@ -36,6 +36,10 @@ public:
     bool wasConnected = false;
     QPointF pos;
 
+    // Clipboard buffer — captures data that arrives between MCP tool calls
+    QString lastClipboardText;
+    QImage lastClipboardImage;
+
     // Macro members
     QString macroDir;
     bool macroPlaying = false;
@@ -68,8 +72,11 @@ Tools::Tools(QObject *parent)
     d->vncClient.setSocket(&d->socket);
     d->vncClient.setFramebufferUpdatesEnabled(false);
     QObject::connect(&d->vncClient, &QVncClient::connectionStateChanged, this, [this](bool connected) {
-        if (!connected && d->wasConnected)
+        if (!connected && d->wasConnected) {
+            d->lastClipboardText.clear();
+            d->lastClipboardImage = QImage();
             emit disconnected();
+        }
         d->wasConnected = connected;
         if (!d->previewWidget)
             return;
@@ -80,6 +87,12 @@ Tools::Tools(QObject *parent)
     });
     QObject::connect(&d->vncClient, &QVncClient::cursorPosChanged, this, [this](const QPoint &pos) {
         d->pos = QPointF(pos);
+    });
+    QObject::connect(&d->vncClient, &QVncClient::clipboardTextReceived, this, [this](const QString &text) {
+        d->lastClipboardText = text;
+    });
+    QObject::connect(&d->vncClient, &QVncClient::clipboardImageReceived, this, [this](const QImage &image) {
+        d->lastClipboardImage = image;
     });
 }
 
@@ -963,6 +976,19 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboard(int timeout)
         return promise.future();
     }
 
+    // Check if clipboard data was already buffered (arrived between tool calls)
+    if (!d->lastClipboardText.isEmpty()) {
+        const QString text = d->lastClipboardText;
+        d->lastClipboardText.clear();
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        QList<QMcpCallToolResultContent> content;
+        content.append(QMcpCallToolResultContent(QMcpTextContent(text)));
+        promise.addResult(content);
+        promise.finish();
+        return promise.future();
+    }
+
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
 
@@ -972,7 +998,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboard(int timeout)
     timeoutTimer->setInterval(timeout);
 
     *conn = QObject::connect(&d->vncClient, &QVncClient::clipboardTextReceived, this,
-        [promise, conn, timeoutTimer](const QString &text) {
+        [this, promise, conn, timeoutTimer](const QString &text) {
+            d->lastClipboardText.clear();
             QObject::disconnect(*conn);
             timeoutTimer->stop();
             timeoutTimer->deleteLater();
@@ -1013,6 +1040,17 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboardImage(int timeout)
         return promise.future();
     }
 
+    // Check if clipboard image was already buffered (arrived between tool calls)
+    if (!d->lastClipboardImage.isNull()) {
+        const QImage image = d->lastClipboardImage;
+        d->lastClipboardImage = QImage();
+        QPromise<QList<QMcpCallToolResultContent>> promise;
+        promise.start();
+        promise.addResult(imageOrError(image));
+        promise.finish();
+        return promise.future();
+    }
+
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
 
@@ -1022,7 +1060,8 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::getClipboardImage(int timeout)
     timeoutTimer->setInterval(timeout);
 
     *conn = QObject::connect(&d->vncClient, &QVncClient::clipboardImageReceived, this,
-        [promise, conn, timeoutTimer](const QImage &image) {
+        [this, promise, conn, timeoutTimer](const QImage &image) {
+            d->lastClipboardImage = QImage();
             QObject::disconnect(*conn);
             timeoutTimer->stop();
             timeoutTimer->deleteLater();

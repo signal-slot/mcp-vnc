@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 #endif
     });
     {
-        QMcpServerCapabilities capabilities;
+        auto capabilities = server.capabilities();
         capabilities.setLogging({});
         server.setCapabilities(capabilities);
     }
