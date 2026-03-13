@@ -18,6 +18,7 @@
 #include <QtGui/QMouseEvent>
 #include <QtGui/QPainter>
 #include <QtGui/QPainterPath>
+#include <cmath>
 #ifdef HAVE_MULTIMEDIA
 #include <QtMultimedia/QMediaCaptureSession>
 #include <QtMultimedia/QMediaFormat>
@@ -816,7 +817,36 @@ bool Tools::deleteMacro(const QString &name)
     return QFile::remove(filePath);
 }
 
-static QList<QMcpCallToolResultContent> checkPixelColorResult(const QImage &image, int x, int y, const QColor &targetColor)
+static qreal colorSimilarityHSV(const QColor &c1, const QColor &c2)
+{
+    float h1, s1, v1, h2, s2, v2;
+    c1.getHsvF(&h1, &s1, &v1);
+    c2.getHsvF(&h2, &s2, &v2);
+
+    // Achromatic colors have h == -1 in Qt; treat as 0
+    if (h1 < 0) h1 = 0;
+    if (h2 < 0) h2 = 0;
+
+    // Hue is cyclic [0, 1), compute circular distance and normalize to [0, 1]
+    qreal dH = qAbs(h1 - h2);
+    if (dH > 0.5) dH = 1.0 - dH;
+    dH *= 2.0;
+
+    const qreal dS = qAbs(s1 - s2);
+    const qreal dV = qAbs(v1 - v2);
+
+    const qreal distance = std::sqrt((dH * dH + dS * dS + dV * dV) / 3.0);
+    return 1.0 - distance;
+}
+
+static bool colorMatches(const QColor &actual, const QColor &target, qreal similarity)
+{
+    if (similarity >= 1.0)
+        return actual.rgb() == target.rgb();
+    return colorSimilarityHSV(actual, target) >= similarity;
+}
+
+static QList<QMcpCallToolResultContent> checkPixelColorResult(const QImage &image, int x, int y, const QColor &targetColor, qreal similarity)
 {
     QList<QMcpCallToolResultContent> content;
     if (image.isNull()) {
@@ -827,15 +857,16 @@ static QList<QMcpCallToolResultContent> checkPixelColorResult(const QImage &imag
                 .arg(x).arg(y).arg(image.width()).arg(image.height()))));
     } else {
         const QColor actual(image.pixel(x, y));
-        const bool match = actual.rgb() == targetColor.rgb();
+        const bool match = colorMatches(actual, targetColor, similarity);
+        const qreal sim = colorSimilarityHSV(actual, targetColor);
         content.append(QMcpCallToolResultContent(QMcpTextContent(
-            match ? QStringLiteral("true")
-                  : QStringLiteral("false (actual: %1)").arg(actual.name()))));
+            match ? QStringLiteral("true (actual: %1, similarity: %2)").arg(actual.name()).arg(sim, 0, 'f', 3)
+                  : QStringLiteral("false (actual: %1, similarity: %2)").arg(actual.name()).arg(sim, 0, 'f', 3))));
     }
     return content;
 }
 
-QFuture<QList<QMcpCallToolResultContent>> Tools::checkPixelColor(int x, int y, const QString &color)
+QFuture<QList<QMcpCallToolResultContent>> Tools::checkPixelColor(int x, int y, const QString &color, qreal similarity)
 {
     const QColor targetColor(color);
     if (!targetColor.isValid()) {
@@ -852,7 +883,7 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::checkPixelColor(int x, int y, c
     if (d->vncClient.framebufferUpdatesEnabled() || d->socket.state() != QTcpSocket::ConnectedState) {
         QPromise<QList<QMcpCallToolResultContent>> promise;
         promise.start();
-        promise.addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor));
+        promise.addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor, similarity));
         promise.finish();
         return promise.future();
     }
@@ -868,19 +899,19 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::checkPixelColor(int x, int y, c
             *hasImageData = true;
         });
     *connFb = QObject::connect(&d->vncClient, &QVncClient::framebufferUpdated, this,
-        [this, promise, connImg, connFb, hasImageData, x, y, targetColor]() {
+        [this, promise, connImg, connFb, hasImageData, x, y, targetColor, similarity]() {
             if (!*hasImageData)
                 return;
             QObject::disconnect(*connImg);
             QObject::disconnect(*connFb);
             d->updateFramebufferUpdates();
-            promise->addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor));
+            promise->addResult(checkPixelColorResult(d->vncClient.image(), x, y, targetColor, similarity));
             promise->finish();
         });
     return promise->future();
 }
 
-QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, const QString &color, int timeout)
+QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, const QString &color, int timeout, qreal similarity)
 {
     const QColor targetColor(color);
 
@@ -924,13 +955,13 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::waitForColor(int x, int y, cons
         d->updateFramebufferUpdates();
     };
 
-    QObject::connect(pollTimer, &QTimer::timeout, this, [this, promise, cleanup, x, y, targetColor]() {
+    QObject::connect(pollTimer, &QTimer::timeout, this, [this, promise, cleanup, x, y, targetColor, similarity]() {
         const QImage &image = d->vncClient.image();
         if (image.isNull())
             return;
         if (x < 0 || x >= image.width() || y < 0 || y >= image.height())
             return;
-        if (QColor(image.pixel(x, y)).rgb() == targetColor.rgb()) {
+        if (colorMatches(QColor(image.pixel(x, y)), targetColor, similarity)) {
             cleanup();
             QImage img = compositeWithCursor(image, &d->vncClient, d->pos);
             promise->addResult(imageOrError(img));

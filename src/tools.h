@@ -54,8 +54,8 @@ public:
     Q_INVOKABLE QString getMacro(const QString &name);
     Q_INVOKABLE bool deleteMacro(const QString &name);
 
-    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> checkPixelColor(int x, int y, const QString &color);
-    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> waitForColor(int x, int y, const QString &color, int timeout = 30000);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> checkPixelColor(int x, int y, const QString &color, qreal similarity = 1.0);
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> waitForColor(int x, int y, const QString &color, int timeout = 30000, qreal similarity = 1.0);
 
     // Clipboard tools
     Q_INVOKABLE void setClipboard(const QString &text);
