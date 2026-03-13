@@ -26,11 +26,12 @@ public:
     QVncClient *client() const;
     void setPreviewWidget(VncWidget *widget);
 
-    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> connect(const QString &host, int port, const QString &password = QString());
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> connect(const QString &host, int port, const QString &password = QString(), const QString &username = QString());
     Q_INVOKABLE void disconnect();
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> screenshot(int x = 0, int y = 0, int width = -1, int height = -1);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> save(const QString &filePath, int x = 0, int y = 0, int width = -1, int height = -1);
     Q_INVOKABLE QString status() const;
+    Q_INVOKABLE QString getCursorInfo() const;
     Q_INVOKABLE void mouseMove(int x, int y, int button = 0);
     Q_INVOKABLE void mouseClick(int x, int y, int button = 1);
     Q_INVOKABLE void doubleClick(int x, int y, int button = 1);
@@ -66,6 +67,7 @@ public:
 #ifdef HAVE_MULTIMEDIA
     Q_INVOKABLE bool startRecording(const QString &filePath, int fps = 10);
     Q_INVOKABLE bool stopRecording();
+    Q_INVOKABLE QString getRecordingStatus() const;
 #endif
 
 signals:

@@ -121,10 +121,12 @@ void Tools::setPreviewWidget(VncWidget *widget)
     }
 }
 
-QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, int port, const QString &password)
+QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, int port, const QString &password, const QString &username)
 {
     if (!password.isEmpty())
         d->vncClient.setPassword(password);
+    if (!username.isEmpty())
+        d->vncClient.setUsername(username);
 
     auto promise = QSharedPointer<QPromise<QList<QMcpCallToolResultContent>>>::create();
     promise->start();
@@ -341,6 +343,17 @@ QString Tools::status() const
             .arg(d->vncClient.framebufferHeight());
     }
     return QStringLiteral("disconnected");
+}
+
+QString Tools::getCursorInfo() const
+{
+    const QPoint pos = d->vncClient.cursorPos();
+    const QPoint hotspot = d->vncClient.cursorHotspot();
+    const QImage cursor = d->vncClient.cursorImage();
+    return QStringLiteral("{\"x\":%1,\"y\":%2,\"hotspotX\":%3,\"hotspotY\":%4,\"cursorWidth\":%5,\"cursorHeight\":%6}")
+        .arg(pos.x()).arg(pos.y())
+        .arg(hotspot.x()).arg(hotspot.y())
+        .arg(cursor.width()).arg(cursor.height());
 }
 
 void Tools::mouseMove(int x, int y, int button)
@@ -1195,5 +1208,13 @@ bool Tools::stopRecording()
     d->updateFramebufferUpdates();
 
     return true;
+}
+
+QString Tools::getRecordingStatus() const
+{
+    if (!d->recording)
+        return QStringLiteral("{\"recording\":false}");
+    return QStringLiteral("{\"recording\":true,\"fps\":%1}")
+        .arg(d->recordingFps);
 }
 #endif

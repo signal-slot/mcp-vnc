@@ -30,10 +30,11 @@ int main(int argc, char *argv[])
     QObject::connect(&server, &QMcpServer::finished, &app, &QCoreApplication::quit);
     auto *tools = new Tools(&server);
     server.registerToolSet(tools, {
-        { "connect", "Connect to a VNC server. Must be called before any other tool. Establishes a TCP connection and performs VNC handshake. Use status() to verify the connection succeeded." },
+        { "connect", "Connect to a VNC server. Must be called before any other tool. Establishes a TCP connection and performs VNC handshake. Supports standard VNC password authentication and Apple Remote Desktop (ARD) username/password authentication for macOS Screen Sharing. Use status() to verify the connection succeeded." },
         { "connect/host", "Hostname or IP address of the VNC server (e.g., \"localhost\", \"192.168.1.100\")" },
         { "connect/port", "Port number of the VNC server (default: 5900). Standard VNC ports are 5900+N where N is the display number." },
         { "connect/password", "Password for VNC authentication (optional). Required only if the VNC server has password authentication enabled." },
+        { "connect/username", "Username for Apple Remote Desktop (ARD) authentication (optional). Required only when connecting to macOS Screen Sharing or ARD servers that use username/password authentication." },
         { "disconnect", "Disconnect from the VNC server. Closes the TCP connection. Safe to call even if not connected." },
         { "screenshot", "Capture the current VNC screen and return as a base64-encoded image. Call with no arguments to capture the full screen, or specify a region with x/y/width/height. Always take a screenshot after performing actions to verify the result. Returns an error message if not connected or the framebuffer is unavailable." },
         { "screenshot/x", "X coordinate of the top-left corner of the capture region in pixels (default: 0)" },
@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
         { "save/width", "Width of the capture region in pixels (default: -1 for full width from x to the right edge)" },
         { "save/height", "Height of the capture region in pixels (default: -1 for full height from y to the bottom edge)" },
         { "status", "Get the current VNC connection status. Returns \"connected to <host>:<port> (<width>x<height>)\" when connected (including the framebuffer resolution), or \"disconnected\" when not connected. Use this after connect() to verify the connection and to learn the screen dimensions." },
+        { "getCursorInfo", "Get the current cursor position, hotspot, and cursor image dimensions. Returns a JSON object with x, y, hotspotX, hotspotY, cursorWidth, cursorHeight. Cursor position is reported by the VNC server via pseudo-encodings; if the server does not support this, values may be zero." },
         { "mouseMove", "Move the mouse cursor to the specified position. Also updates the internal cursor position used as the starting point for dragAndDrop. Set the button parameter to simulate dragging while moving." },
         { "mouseMove/x", "Target X coordinate in pixels (0 = left edge of screen)" },
         { "mouseMove/y", "Target Y coordinate in pixels (0 = top edge of screen)" },
@@ -131,6 +133,7 @@ int main(int argc, char *argv[])
         { "startRecording/filePath", "Absolute file path for the output MP4 file (e.g., /tmp/recording.mp4). The directory must exist. The file will be overwritten if it already exists." },
         { "startRecording/fps", "Frames per second for the recording (default: 10, range: 1-60). Higher values produce smoother video but larger files. 10 FPS is usually sufficient for UI interaction recordings." },
         { "stopRecording", "Stop the current screen recording and finalize the MP4 file. The video file is written and closed when this is called. Returns false if no recording is in progress." },
+        { "getRecordingStatus", "Get the current screen recording status. Returns a JSON object with \"recording\" (boolean) and \"fps\" (integer, only present when recording). Use this to check if a recording is in progress." },
 #endif
     });
     {
