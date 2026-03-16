@@ -26,7 +26,7 @@ public:
     QVncClient *client() const;
     void setPreviewWidget(VncWidget *widget);
 
-    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> connect(const QString &host, int port, const QString &password = QString(), const QString &username = QString());
+    Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> connect(const QString &host, int port, const QString &password = QString(), const QString &username = QString(), int timeout = 30000);
     Q_INVOKABLE void disconnect();
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> screenshot(int x = 0, int y = 0, int width = -1, int height = -1);
     Q_INVOKABLE QFuture<QList<QMcpCallToolResultContent>> save(const QString &filePath, int x = 0, int y = 0, int width = -1, int height = -1);

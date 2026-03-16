@@ -336,11 +336,18 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::save(const QString &filePath, i
 QString Tools::status() const
 {
     if (d->socket.state() == QTcpSocket::ConnectedState) {
-        return QStringLiteral("connected to %1:%2 (%3x%4)")
+        const int w = d->vncClient.framebufferWidth();
+        const int h = d->vncClient.framebufferHeight();
+        if (w > 0 && h > 0) {
+            return QStringLiteral("connected to %1:%2 (%3x%4)")
+                .arg(d->socket.peerName())
+                .arg(d->socket.peerPort())
+                .arg(w)
+                .arg(h);
+        }
+        return QStringLiteral("connecting to %1:%2 (VNC handshake in progress)")
             .arg(d->socket.peerName())
-            .arg(d->socket.peerPort())
-            .arg(d->vncClient.framebufferWidth())
-            .arg(d->vncClient.framebufferHeight());
+            .arg(d->socket.peerPort());
     }
     return QStringLiteral("disconnected");
 }
