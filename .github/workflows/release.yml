@@ -187,6 +187,9 @@ jobs:
             cp build/mcp-vnc.exe "dist/mcp-vnc-${{ matrix.name }}.exe"
           else
             cp build/mcp-vnc "dist/mcp-vnc-${{ matrix.name }}"
+            if [ "$RUNNER_OS" = "macOS" ]; then
+              xattr -cr "dist/mcp-vnc-${{ matrix.name }}"
+            fi
           fi
 
       - name: Upload artifact

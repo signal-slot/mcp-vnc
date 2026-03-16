@@ -12,6 +12,12 @@ Download the latest binary for your platform from [Releases](https://github.com/
 | macOS arm64 | `mcp-vnc-macos-arm64` |
 | Windows x64 | `mcp-vnc-windows-x64.exe` |
 
+On macOS, you need to remove the quarantine attribute before use:
+
+```bash
+xattr -cr /path/to/mcp-vnc-macos-arm64
+```
+
 ```json
 {
   "mcpServers": {
