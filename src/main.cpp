@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
         { "connect/port", "Port number of the VNC server (default: 5900). Standard VNC ports are 5900+N where N is the display number." },
         { "connect/password", "Password for VNC authentication (optional). Required only if the VNC server has password authentication enabled." },
         { "connect/username", "Username for Apple Remote Desktop (ARD) authentication (optional). Required only when connecting to macOS Screen Sharing or ARD servers that use username/password authentication." },
+        { "connect/timeout", "Connection timeout in milliseconds (default: 30000, i.e., 30 seconds). If the VNC handshake does not complete within this time, the connection is aborted and an error is returned." },
         { "disconnect", "Disconnect from the VNC server. Closes the TCP connection. Safe to call even if not connected." },
         { "screenshot", "Capture the current VNC screen and return as a base64-encoded image. Call with no arguments to capture the full screen, or specify a region with x/y/width/height. Always take a screenshot after performing actions to verify the result. Returns an error message if not connected or the framebuffer is unavailable." },
         { "screenshot/x", "X coordinate of the top-left corner of the capture region in pixels (default: 0)" },

@@ -121,7 +121,7 @@ void Tools::setPreviewWidget(VncWidget *widget)
     }
 }
 
-QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, int port, const QString &password, const QString &username)
+QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, int port, const QString &password, const QString &username, int timeout)
 {
     if (!password.isEmpty())
         d->vncClient.setPassword(password);
@@ -135,12 +135,16 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, in
     auto connFb = QSharedPointer<QMetaObject::Connection>::create();
     auto connErr = QSharedPointer<QMetaObject::Connection>::create();
     auto connDisc = QSharedPointer<QMetaObject::Connection>::create();
+    auto timer = new QTimer(this);
+    timer->setSingleShot(true);
 
-    auto cleanup = [connTcp, connFb, connErr, connDisc]() {
+    auto cleanup = [connTcp, connFb, connErr, connDisc, timer]() {
         QObject::disconnect(*connTcp);
         QObject::disconnect(*connFb);
         QObject::disconnect(*connErr);
         QObject::disconnect(*connDisc);
+        timer->stop();
+        timer->deleteLater();
     };
 
     // Wait for TCP connection before enabling framebuffer updates.
@@ -184,6 +188,20 @@ QFuture<QList<QMcpCallToolResultContent>> Tools::connect(const QString &host, in
             promise->addResult(content);
             promise->finish();
         });
+
+    // Handle connection timeout
+    QObject::connect(timer, &QTimer::timeout, this,
+        [this, promise, cleanup, host, port]() {
+            cleanup();
+            d->socket.abort();
+            d->updateFramebufferUpdates();
+            QList<QMcpCallToolResultContent> content;
+            content.append(QMcpCallToolResultContent(QMcpTextContent(
+                QStringLiteral("Error: connection to %1:%2 timed out").arg(host).arg(port))));
+            promise->addResult(content);
+            promise->finish();
+        });
+    timer->start(timeout);
 
     d->socket.connectToHost(host, port);
     return promise->future();
