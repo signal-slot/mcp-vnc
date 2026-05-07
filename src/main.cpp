@@ -7,6 +7,8 @@ Q_IMPORT_PLUGIN(QMcpServerStdioPlugin)
 #endif
 
 #include <QtWidgets/QApplication>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtMcpServer/QMcpServer>
 #include <QtMcpServer/QMcpServerSession>
 #include <QtMcpCommon/QMcpLoggingMessageNotification>
@@ -14,11 +16,71 @@ Q_IMPORT_PLUGIN(QMcpServerStdioPlugin)
 #include <QtMcpCommon/QMcpPromptMessage>
 #include <QtMcpCommon/QMcpServerCapabilities>
 #include <QtMcpCommon/QMcpTextContent>
+#include <unistd.h>
 #include "tools.h"
 #include "vncwidget.h"
 
+namespace {
+
+// MCP clients (e.g. codex) often spawn the server with display env vars stripped.
+// Probe the local session for a usable Wayland or X11 socket and set the matching
+// env vars so the optional preview window still works. Returns false if nothing
+// usable is found, in which case the caller should select the offscreen platform.
+bool detectDisplayEnv()
+{
+    QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
+    if (runtimeDir.isEmpty())
+        runtimeDir = "/run/user/" + QByteArray::number(::getuid());
+
+    if (QFile::exists(QString::fromLocal8Bit(runtimeDir))) {
+        for (int n = 0; n < 4; ++n) {
+            const QByteArray sock = "wayland-" + QByteArray::number(n);
+            if (QFile::exists(QString::fromLocal8Bit(runtimeDir + "/" + sock))) {
+                if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR"))
+                    qputenv("XDG_RUNTIME_DIR", runtimeDir);
+                qputenv("WAYLAND_DISPLAY", sock);
+                return true;
+            }
+        }
+    }
+
+    QDir x11(QStringLiteral("/tmp/.X11-unix"));
+    if (x11.exists()) {
+        const auto entries = x11.entryList({QStringLiteral("X[0-9]*")},
+                                           QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot);
+        for (const QString &name : entries) {
+            bool ok = false;
+            const int n = name.mid(1).toInt(&ok);
+            if (!ok)
+                continue;
+            qputenv("DISPLAY", QByteArray(":") + QByteArray::number(n));
+            if (qEnvironmentVariableIsEmpty("XAUTHORITY")) {
+                const QByteArray xauth = qgetenv("HOME") + "/.Xauthority";
+                if (QFile::exists(QString::fromLocal8Bit(xauth)))
+                    qputenv("XAUTHORITY", xauth);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
 int main(int argc, char *argv[])
 {
+    // MCP clients such as codex strip display env vars before spawning the
+    // server, so Qt's default xcb plugin aborts before initialize can be
+    // answered and the client reports a startup timeout. Auto-detect a local
+    // Wayland or X11 session so the preview window keeps working; fall back
+    // to the offscreen platform only when no display is available.
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")
+        && qEnvironmentVariableIsEmpty("DISPLAY")
+        && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")
+        && !detectDisplayEnv()) {
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+    }
+
     QApplication app(argc, argv);
     app.setApplicationName("MCP VNC Server");
     app.setApplicationVersion("1.0");
